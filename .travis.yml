@@ -1,0 +1,58 @@
+language: cpp
+
+sudo: required
+
+matrix:
+    include:
+        - os: linux
+          compiler: g++
+          env: BUILD_TYPE=Dev
+
+# http://docs.travis-ci.com/user/apt/
+addons:
+    apt:
+        sources:
+            - ubuntu-toolchain-r-test
+            - boost-latest
+        packages:
+            - libproj-dev
+            - spatialite-bin
+            - libbz2-dev
+            - libexpat1-dev
+            - libgeos++-dev
+            - libpthread-stubs0-dev
+            - zlib1g-dev
+            - libsparsehash-dev
+            - protobuf-compiler
+            - libprotobuf-dev
+   
+install:
+            - sudo apt-get install -qq gcc-4.9 g++-4.9
+            - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.9 90
+            - sudo apt-get -y install gdal-bin
+            - sudo apt-get -y install make libgdal-dev
+            - sudo apt-get -y install libboost1.54-dev libboost-program-options1.54-dev libboost-system1.54-dev libboost-filesystem1.54-dev
+
+            - mkdir -p ${HOME}/libs && cd ${HOME}/libs
+            
+            # osmium is header only, so nothing to install
+            - git clone https://github.com/osmcode/libosmium
+            
+            # install shapelib
+            - curl http://download.osgeo.org/shapelib/shapelib-1.3.0.tar.gz -o shapelib-1.3.0.tar.gz
+            - tar xzf shapelib-1.3.0.tar.gz && rm shapelib-1.3.0.tar.gz
+            - cd shapelib-1.3.0 && make && sudo make install
+            - sudo chmod 644 /usr/local/include/shapefil.h
+            
+            # install osmpbf
+            - git clone --quiet --depth 1 https://github.com/scrosby/OSM-binary.git ${HOME}/libs/OSM-binary/
+            - cd ${HOME}/libs/OSM-binary/src
+            - make
+            
+script:
+            # build morituri
+            - cd ${HOME}/build/knowname/morituri
+            - make -j2
+
+            # run tests
+            - make test
