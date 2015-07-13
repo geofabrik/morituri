@@ -2,11 +2,10 @@
 # morituri -- the COMMercial2OSM converter
 
 comm2osm creates an OSM (OpenStreetMap) PBF/XML/etc. file from commercial shapefiles to be able to use OSM tools on the data. <br>
-The architecture is plugin based.
 
 [![Build Status](https://secure.travis-ci.org/knowname/morituri.png)](http://travis-ci.org/knowname/morituri)
 
-Currently there is a plugin (navteq) for converting routable Navteq data from the "NAVSTREETS Street Data Reference Manual v5.4" format into OSM format.
+The architecture is plugin based. Currently there is a plugin (navteq) for converting routable Navteq data from the "NAVSTREETS Street Data Reference Manual v5.4" format into OSM format.
 
 WARNING: DO NOT UPLOAD CONVERTED DATA TO OSM.
 Even if you were legally allowed to do so, imports into OSM
@@ -55,7 +54,11 @@ e.g.
 an XML file <br> or `./comm2osm ~/navteq-testdata/ ~/navteq-testdata/routable.pbf` 
 to produce a PBF file.
 
+### Test data
 
+If you want to test this program and you don't have data of your own you may get sample downloads from the following list:
+
+* [Test data in NAVSTREETS format](http://www.navmart.com/download.php)
 
 ---
 
