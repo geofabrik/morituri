@@ -174,12 +174,15 @@ void parse_street_tag(osmium::builder::TagListBuilder *builder, const char* fiel
 // matching from http://www.loc.gov/standards/iso639-2/php/code_list.php
 // ISO-639 conversion
 std::string parse_lang_code(std::string lang_code) {
+    if (lang_code == "AAR") return "aa";
     if (lang_code == "ABK") return "ab";
     if (lang_code == "AFR") return "af";
     if (lang_code == "AKA") return "ak";
+    if (lang_code == "ALB") return "sq";
     if (lang_code == "AMH") return "am";
     if (lang_code == "ARA") return "ar";
     if (lang_code == "ARG") return "an";
+    if (lang_code == "ARM") return "hy";
     if (lang_code == "ASM") return "as";
     if (lang_code == "AVA") return "av";
     if (lang_code == "AVE") return "ae";
@@ -187,6 +190,7 @@ std::string parse_lang_code(std::string lang_code) {
     if (lang_code == "AZE") return "az";
     if (lang_code == "BAK") return "ba";
     if (lang_code == "BAM") return "bm";
+    if (lang_code == "BAQ") return "eu";
     if (lang_code == "BEL") return "be";
     if (lang_code == "BEN") return "bn";
     if (lang_code == "BIH") return "bh";
@@ -194,16 +198,20 @@ std::string parse_lang_code(std::string lang_code) {
     if (lang_code == "BOS") return "bs";
     if (lang_code == "BRE") return "br";
     if (lang_code == "BUL") return "bg";
+    if (lang_code == "BUR") return "my";
     if (lang_code == "CAT") return "ca";
     if (lang_code == "CHA") return "ch";
     if (lang_code == "CHE") return "ce";
+    if (lang_code == "CHI") return "zh";
     if (lang_code == "CHU") return "cu";
     if (lang_code == "CHV") return "cv";
     if (lang_code == "COR") return "kw";
     if (lang_code == "COS") return "co";
     if (lang_code == "CRE") return "cr";
+    if (lang_code == "CZE") return "cs";
     if (lang_code == "DAN") return "da";
     if (lang_code == "DIV") return "dv";
+    if (lang_code == "DUT") return "nl";
     if (lang_code == "DZO") return "dz";
     if (lang_code == "ENG") return "en";
     if (lang_code == "EPO") return "eo";
@@ -212,12 +220,16 @@ std::string parse_lang_code(std::string lang_code) {
     if (lang_code == "FAO") return "fo";
     if (lang_code == "FIJ") return "fj";
     if (lang_code == "FIN") return "fi";
+    if (lang_code == "FRE") return "fr";
     if (lang_code == "FRY") return "fy";
     if (lang_code == "FUL") return "ff";
+    if (lang_code == "GEO") return "ka";
+    if (lang_code == "GER") return "de";
     if (lang_code == "GLA") return "gd";
     if (lang_code == "GLE") return "ga";
     if (lang_code == "GLG") return "gl";
     if (lang_code == "GLV") return "gv";
+    if (lang_code == "GRE") return "el";
     if (lang_code == "GRN") return "gn";
     if (lang_code == "GUJ") return "gu";
     if (lang_code == "HAT") return "ht";
@@ -229,6 +241,7 @@ std::string parse_lang_code(std::string lang_code) {
     if (lang_code == "HRV") return "hr";
     if (lang_code == "HUN") return "hu";
     if (lang_code == "IBO") return "ig";
+    if (lang_code == "ICE") return "is";
     if (lang_code == "IDO") return "io";
     if (lang_code == "III") return "ii";
     if (lang_code == "IKU") return "iu";
@@ -262,9 +275,12 @@ std::string parse_lang_code(std::string lang_code) {
     if (lang_code == "LTZ") return "lb";
     if (lang_code == "LUB") return "lu";
     if (lang_code == "LUG") return "lg";
+    if (lang_code == "MAC") return "mk";
     if (lang_code == "MAH") return "mh";
     if (lang_code == "MAL") return "ml";
+    if (lang_code == "MAO") return "mi";
     if (lang_code == "MAR") return "mr";
+    if (lang_code == "MAY") return "ms";
     if (lang_code == "MLG") return "mg";
     if (lang_code == "MLT") return "mt";
     if (lang_code == "MON") return "mn";
@@ -284,17 +300,20 @@ std::string parse_lang_code(std::string lang_code) {
     if (lang_code == "ORM") return "om";
     if (lang_code == "OSS") return "os";
     if (lang_code == "PAN") return "pa";
+    if (lang_code == "PER") return "fa";
     if (lang_code == "PLI") return "pi";
     if (lang_code == "POL") return "pl";
     if (lang_code == "POR") return "pt";
     if (lang_code == "PUS") return "ps";
     if (lang_code == "QUE") return "qu";
     if (lang_code == "ROH") return "rm";
+    if (lang_code == "RUM") return "ro";
     if (lang_code == "RUN") return "rn";
     if (lang_code == "RUS") return "ru";
     if (lang_code == "SAG") return "sg";
     if (lang_code == "SAN") return "sa";
     if (lang_code == "SIN") return "si";
+    if (lang_code == "SLO") return "sk";
     if (lang_code == "SLV") return "sl";
     if (lang_code == "SME") return "se";
     if (lang_code == "SMO") return "sm";
@@ -316,6 +335,7 @@ std::string parse_lang_code(std::string lang_code) {
     if (lang_code == "TGK") return "tg";
     if (lang_code == "TGL") return "tl";
     if (lang_code == "THA") return "th";
+    if (lang_code == "TIB") return "bo";
     if (lang_code == "TIR") return "ti";
     if (lang_code == "TON") return "to";
     if (lang_code == "TSN") return "tn";
@@ -330,6 +350,7 @@ std::string parse_lang_code(std::string lang_code) {
     if (lang_code == "VEN") return "ve";
     if (lang_code == "VIE") return "vi";
     if (lang_code == "VOL") return "vo";
+    if (lang_code == "WEL") return "cy";
     if (lang_code == "WLN") return "wa";
     if (lang_code == "WOL") return "wo";
     if (lang_code == "XHO") return "xh";
