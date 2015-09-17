@@ -79,5 +79,6 @@ int main(int argc, char* argv[]) {
             std::cout << "executing plugin " << plugin->get_name() << std::endl;
             plugin->execute();
         }
+        delete plugin;
     }
 }

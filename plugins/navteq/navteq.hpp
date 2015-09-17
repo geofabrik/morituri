@@ -550,7 +550,7 @@ void process_admin_boundaries() {
                 if (mtd_area_map.find(area_id) != mtd_area_map.end()) {
                     auto d = mtd_area_map.at(area_id);
                     if (!d.admin_lvl.empty()) tl_builder.add_tag("navteq_admin_level", d.admin_lvl);
-                    if (!d.admin_lvl.empty()) tl_builder.add_tag("admin_level", navteq_2_osm_admin_lvl(d.admin_lvl));
+                    if (!d.admin_lvl.empty()) tl_builder.add_tag("admin_level", navteq_2_osm_admin_lvl(d.admin_lvl).c_str());
                     for (auto it : d.lang_code_2_area_name)
                         tl_builder.add_tag(std::string("name:" + parse_lang_code(it.first)), it.second);
 
@@ -604,6 +604,7 @@ void process_meta_areas(DBFHandle handle) {
         mtd_area_map.insert(std::make_pair(area_id, data));
 //		data.print();
     }
+    DBFClose(handle);
 }
 
 /**
@@ -675,6 +676,7 @@ void add_point_layer_to_osmium(OGRLayer *layer, std::string dir = std::string())
         osmium::builder::NodeBuilder builder(m_buffer);
         build_node(osmium::Location(p->getX(), p->getY()), &builder);
         build_tag_list(&builder);
+        delete cur_feat;
     }
     m_buffer.commit();
 }
@@ -693,13 +695,21 @@ void add_street_shape_to_osmium(OGRLayer *layer, std::string dir = std::string()
     z_lvl_map z_level_map = process_z_levels(read_dbf_file(dir + sub_dir + ZLEVELS_DBF));
 
 // get all nodes which may be a routable crossing
-    while ((cur_feat = cur_layer->GetNextFeature()) != NULL)
+    while ((cur_feat = cur_layer->GetNextFeature()) != NULL){
         process_way_end_nodes(static_cast<OGRLineString*>(cur_feat->GetGeometryRef()));
+        delete cur_feat;
+    }
     m_buffer.commit();
 
     cur_layer->ResetReading();
-    while ((cur_feat = cur_layer->GetNextFeature()) != NULL)
+    while ((cur_feat = cur_layer->GetNextFeature()) != NULL){
         process_way(static_cast<OGRLineString*>(cur_feat->GetGeometryRef()), &z_level_map);
+        delete cur_feat;
+    }
+    for (auto elem : z_level_map)
+        elem.second.clear();
+    z_level_map.clear();
+    delete layer;
 }
 
 /**
@@ -715,9 +725,11 @@ void add_admin_shape_to_osmium(OGRLayer *layer, std::string dir = std::string(),
 
 //    std::cout << "feature count = " << layer->GetFeatureCount() << std::endl;
 
-    while ((cur_feat = layer->GetNextFeature()) != NULL) {
+    while ((cur_feat = cur_layer->GetNextFeature()) != NULL) {
         process_admin_boundaries();
+        delete cur_feat;
     }
+    delete layer;
 }
 
 /****************************************************

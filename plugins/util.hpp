@@ -34,6 +34,7 @@ bool shp_file_exists(const char* shp_file) {
 //		std::cerr << "Open of " << shp_file << " failed" << std::endl;
         return false;
     }
+    delete shapedriver;
     return true;
 }
 
@@ -55,6 +56,7 @@ bool dbf_file_exists(const char* dbf_file) {
         std::cerr << "Open of " << dbf_file << " failed" << std::endl;
         return false;
     }
+    DBFClose(handle);
     return true;
 }
 

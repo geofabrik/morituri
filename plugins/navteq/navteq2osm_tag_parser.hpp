@@ -106,16 +106,9 @@ const char* to_camel_case_with_spaces(char* camel) {
 }
 
 /**
- * \brief duplicate const char* value to change
- */
-const char* to_camel_case_with_spaces(const char* camel) {
-    return to_camel_case_with_spaces(strdup(camel));
-}
-
-/**
  * \brief apply camel case with spaces to string
  */
-const char* to_camel_case_with_spaces(std::string camel) {
+std::string& to_camel_case_with_spaces(std::string& camel) {
     bool new_word = true;
     for (auto it = camel.begin(); it != camel.end(); ++it) {
         if (std::isalpha(*it)) {
@@ -128,7 +121,16 @@ const char* to_camel_case_with_spaces(std::string camel) {
         } else
             new_word = true;
     }
-    return camel.c_str();
+    return camel;
+}
+
+/**
+ * \brief duplicate const char* value to change
+ */
+std::string to_camel_case_with_spaces(const char* camel) {
+    std::string s(camel);
+    to_camel_case_with_spaces(s);
+    return s;
 }
 
 /**
@@ -144,11 +146,9 @@ void add_tag_access_private(osmium::builder::TagListBuilder* builder) {
 void parse_street_tag(osmium::builder::TagListBuilder *builder, const char* field, const char* value) {
     if (!strcmp(field, "FUNC_CLASS"))
         add_highway_tag(value, builder);
-    else if (!strcmp(field, "ST_NAME")) {
-        const char* camel_value = to_camel_case_with_spaces(value);
-        builder->add_tag("name", camel_value);
-        delete camel_value;
-    } else if (!strcmp(field, "DIR_TRAVEL"))
+    else if (!strcmp(field, "ST_NAME"))
+        builder->add_tag("name", to_camel_case_with_spaces(value).c_str());
+    else if (!strcmp(field, "DIR_TRAVEL"))
         add_one_way_tag(value, builder);
     else if (!strncmp(field, "AR_", 3))
         add_access_tags(field, value, builder);
@@ -340,10 +340,9 @@ std::string parse_lang_code(std::string lang_code) {
 
     std::cerr << lang_code << " not found!" << std::endl;
     throw std::runtime_error("Language code '" + lang_code + "' not found");
-    return "";
 }
 
-const char* navteq_2_osm_admin_lvl(std::string navteq_admin_lvl) {
+std::string navteq_2_osm_admin_lvl(std::string navteq_admin_lvl) {
     if (string_is_not_integer(navteq_admin_lvl)) throw std::runtime_error("admin level contains invalid character");
 
     int navteq_admin_lvl_int = stoi(navteq_admin_lvl);
