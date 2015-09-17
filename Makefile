@@ -43,14 +43,16 @@ endif
 INCLUDES=${OSMIUM_INCLUDE} -Iplugins ${OSMPBF_INCLUDE}
 LIBS=-lbz2 -lgdal -lexpat -lgeos -lpthread -lz -lprotobuf-lite -lboost_system -lboost_filesystem ${OSMPBF_LIBRARY}
 
+CXXFLAGS=-std=c++11 
+
 all: comm2osm tests/navteq_test
 .PHONY: all
 
 comm2osm: ${SOURCE} ${HEADER} 
-	g++ -std=c++11 -o comm2osm ${SOURCE} ${INCLUDES} ${LIBS}
+	g++ ${CXXFLAGS} -o comm2osm ${SOURCE} ${INCLUDES} ${LIBS}
 
 tests/navteq_test: ${TEST_SOURCE} ${TEST_HEADER} 
-	g++ -std=c++11 -o tests/navteq_test ${TEST_SOURCE} ${INCLUDES} ${LIBS}
+	g++ ${CXXFLAGS} -o tests/navteq_test ${TEST_SOURCE} ${INCLUDES} ${LIBS}
 
 test:
 	./tests/navteq_test
