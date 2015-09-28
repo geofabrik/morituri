@@ -191,8 +191,8 @@ German Ministry of Education and Research (Bundesministeriums für Bildung und F
 
 
 ---
-<img src="images/bmbf.jpeg" height="150"> 
-<img src="images/PT-DLR-englisch.jpg" height="80" vspace="30">
-<img src="images/geofabrik.png" height="90" vspace="30" hspace="20">
+<a href="http://www.bmbf.de/en/"><img src="images/bmbf.jpeg" height="150"></a>
+<a href="http://www.dlr.de/en/"><img src="images/PT-DLR-englisch.jpg" height="80" vspace="30"></a>
+<a href="http://www.geofabrik.de/en/index.html"><img src="images/geofabrik.png" height="90" vspace="30" hspace="20"></a>
 
 ##### *Das diesem Bericht zugrundeliegende Vorhaben wurde mit Mitteln des Bundesministeriums für Bildung und Forschung unter dem Förderkennzeichen 01IS13033D gefördert. Die Verantwortung für den Inhalt dieser Veröffentlichung liegt beim Autor.*
