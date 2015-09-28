@@ -77,6 +77,11 @@ If you want to test this program and you don't have data of your own you may get
 * The plugin makes use of oneway="-1" tag, due to how the Navteq data is aligned.
   Most OSM programmes can handle this, but Maperitive ignores it.
 
+##### QGIS:
+* QGIS currently doesn't support unsorted OSM-files. So if you want to open XML/PBF files created by morituri with QGIS you have to sort them beforehand. Sorting can be done with <a href="http://wiki.openstreetmap.org/wiki/Osmosis">osmosis</a> like this:
+
+`osmosis --read-pbf file=/path/to/unsorted/file.pbf --sort --write-pbf file=/path/to/sorted/output/file.pbf`
+
 ---
 
 ## Simplifications:
