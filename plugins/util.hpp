@@ -148,8 +148,8 @@ void print_map(std::map<Type1, Type2> map) {
 }
 
 template<class Type1, class Type2>
-void init_map_at_element(std::map<Type1, Type2> *map, Type1 element, osmium::unsigned_object_id_type id) {
-    if (map->find(element) == map->end()) map->insert(std::make_pair(element, id));
+void init_map_at_element(std::map<Type1, Type2> *map, Type1 key, osmium::unsigned_object_id_type id) {
+    if (map->find(key) == map->end()) map->insert(std::make_pair(key, id));
 }
 
 #endif /* UTIL_HPP_ */

@@ -45,7 +45,7 @@
 // maps location to node ids
 typedef std::map<osmium::Location, osmium::unsigned_object_id_type> node_map;
 
-// maps navteq link_ids to
+// maps navteq link_ids to pairs of <index, z_lvl>
 typedef std::map<uint64_t, std::vector<std::pair<ushort, short>>>z_lvl_map;
 
 static constexpr int buffer_size = 10 * 1000 * 1000;
@@ -99,12 +99,42 @@ void set_dummy_osm_object_attributes(osmium::OSMObject& obj) {
 }
 
 /**
+ * \brief adds mutual node of two ways as via role (required)
+ *
+ * \param osm_ids vector with osm_ids of ways which belong to the turn restriction
+ * \param rml_builder relation member list builder of turn restriction
+ */
+
+void add_common_node_as_via(std::vector<osmium::unsigned_object_id_type>* osm_ids,
+    osmium::builder::RelationMemberListBuilder& rml_builder) {
+    assert(osm_ids->size() == 2);
+
+    const osmium::Way &from_way = m_buffer.get<const osmium::Way>(offset_map.get(osm_ids->at(0)));
+    auto from_way_front = from_way.nodes().front().location();
+    auto from_way_back = from_way.nodes().back().location();
+
+    const osmium::Way &to_way = m_buffer.get<const osmium::Way>(offset_map.get(osm_ids->at(1)));
+    auto to_way_front = to_way.nodes().front().location();
+    auto to_way_back = to_way.nodes().back().location();
+
+    if (from_way_front == to_way_front) rml_builder.add_member(osmium::item_type::node,
+            way_end_points_map.at(from_way_front), "via");
+    else if (from_way_front == to_way_back) rml_builder.add_member(osmium::item_type::node,
+            way_end_points_map.at(from_way_front), "via");
+    else if (from_way_back == to_way_front) rml_builder.add_member(osmium::item_type::node,
+            way_end_points_map.at(from_way_back), "via");
+    else {
+        rml_builder.add_member(osmium::item_type::node, way_end_points_map.at(from_way_back), "via");
+        assert(from_way_back == to_way_back);
+    }
+}
+
+/**
  * \brief writes turn restrictions as Relation to m_buffer.
- * 			required roles: "from" and "to".
- * 			optional role: "via" (multiple "via"s are allowed)
+ * 			required roles: "from" "via" and "to" (multiple "via"s are allowed)
  * 			the order of *links is important to assign the correct role.
  *
- * \param osm_ids vector with osm_ids of all nodes which belong to the turn restriction
+ * \param osm_ids vector with osm_ids of ways which belong to the turn restriction
  * \return Last number of committed bytes to m_buffer before this commit.
  */
 size_t write_turn_restriction(std::vector<osmium::unsigned_object_id_type> *osm_ids) {
@@ -127,6 +157,7 @@ size_t write_turn_restriction(std::vector<osmium::unsigned_object_id_type> *osm_
         osmium::builder::TagListBuilder tl_builder(m_buffer, &builder);
         // todo get the correct direction of the turn restriction
         tl_builder.add_tag("restriction", "no_straight_on");
+        tl_builder.add_tag("type", "restriction");
     }
     return m_buffer.commit();
 }
