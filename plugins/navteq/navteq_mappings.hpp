@@ -17,6 +17,7 @@ const std::string ADMINBNDY_4_SHP = "Adminbndy4.shp";
 
 const std::string MTD_AREA_DBF = "MtdArea.dbf";
 const std::string RDMS_DBF = "Rdms.dbf";
+const std::string CDMS_DBF = "Cdms.dbf";
 const std::string ZLEVELS_DBF = "Zlevels.dbf";
 
 // MTD_AREA_DBF columns
@@ -29,6 +30,11 @@ const char* ADMIN_LVL = "ADMIN_LVL";
 const char* LINK_ID = "LINK_ID";
 const char* COND_ID = "COND_ID";
 const char* MAN_LINKID = "MAN_LINKID";
+
+// CDMS_DBF columns
+const char* COND_TYPE = "COND_TYPE";
+
+#define RESTRICTED_DRIVING_MANOEUVRE 7
 
 // ZLEVELS_DBF columns
 const char* Z_LEVEL = "Z_LEVEL";

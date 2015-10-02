@@ -45,13 +45,20 @@
 // maps location to node ids
 typedef std::map<osmium::Location, osmium::unsigned_object_id_type> node_map;
 
+// type of z-levels (range -4 to +5)
+typedef short z_lvl_type;
+
 // maps navteq link_ids to pairs of <index, z_lvl>
-typedef std::map<uint64_t, std::vector<std::pair<ushort, short>>>z_lvl_map;
+typedef std::map<uint64_t, std::vector<std::pair<ushort, z_lvl_type>>>z_lvl_map;
 
 static constexpr int buffer_size = 10 * 1000 * 1000;
 
 // maps location of way end nodes to node ids
 node_map way_end_points_map;
+
+typedef std::pair<osmium::Location, z_lvl_type> node_id_type;
+
+std::map<node_id_type, osmium::unsigned_object_id_type> z_lvl_nodes_map;
 
 // stores osm objects, grows if needed.
 osmium::memory::Buffer m_buffer(buffer_size);
@@ -152,6 +159,7 @@ size_t write_turn_restriction(std::vector<osmium::unsigned_object_id_type> *osm_
         rml_builder.add_member(osmium::item_type::way, osm_ids->at(0), "from");
         for (int i = 1; i < osm_ids->size() - 1; i++)
             rml_builder.add_member(osmium::item_type::way, osm_ids->at(i), "via");
+        if (osm_ids->size() == 2) add_common_node_as_via(osm_ids, rml_builder);
         rml_builder.add_member(osmium::item_type::way, osm_ids->at(osm_ids->size() - 1), "to");
 
         osmium::builder::TagListBuilder tl_builder(m_buffer, &builder);
@@ -353,6 +361,7 @@ void create_sub_way_by_index(ushort start_index, ushort end_index, OGRLineString
  * \param node_z_level_vector holds [index, z_level] pairs to process
  * \param ogr_ls given way which has to be splitted
  * \param node_ref_map location to osm_id mapping (to preserve uniqueness of node locations)
+ * \return start_index
  */
 ushort create_continuing_sub_ways(ushort first_index, ushort start_index, ushort last_index, uint link_id,
         std::vector<std::pair<ushort, short> >* node_z_level_vector, OGRLineString* ogr_ls, node_map* node_ref_map) {
@@ -464,13 +473,43 @@ void split_way_by_z_level(OGRLineString* ogr_ls, std::vector<std::pair<ushort, s
  ****************************************************/
 
 /**
+ * \brief determines osm_id for end_point. If it doesn't exist it will be created.
+ */
+
+void process_end_point(bool first, ushort end_point_index, z_lvl_type end_point_z_lvl, OGRLineString *ogr_ls,
+        z_lvl_map *z_level_map, std::map<osmium::Location, osmium::unsigned_object_id_type> & node_ref_map) {
+    ushort i = first ? 0 : ogr_ls->getNumPoints() - 1;
+    osmium::Location location(ogr_ls->getX(i), ogr_ls->getY(i));
+    auto it2 = z_lvl_nodes_map.find(std::make_pair(location, end_point_z_lvl));
+    if (it2 != z_lvl_nodes_map.end()){
+        osmium::unsigned_object_id_type osm_id = it2->second;
+        node_ref_map.insert(std::make_pair(location, osm_id));
+    } else {
+        osmium::unsigned_object_id_type osm_id = build_node(location);
+        node_ref_map.insert(std::make_pair(location, osm_id));
+        node_id_type node_id = std::make_pair(location, end_point_z_lvl);
+        z_lvl_nodes_map.insert(std::make_pair(node_id, osm_id));
+    }
+}
+
+void process_first_end_point(ushort index, z_lvl_type z_lvl, OGRLineString *ogr_ls,
+        z_lvl_map *z_level_map, std::map<osmium::Location, osmium::unsigned_object_id_type> & node_ref_map){
+    process_end_point(true, index, z_lvl, ogr_ls, z_level_map, node_ref_map);
+}
+
+void process_last_end_point(ushort index, z_lvl_type z_lvl, OGRLineString *ogr_ls,
+        z_lvl_map *z_level_map, std::map<osmium::Location, osmium::unsigned_object_id_type> & node_ref_map){
+    process_end_point(false, index, z_lvl, ogr_ls, z_level_map, node_ref_map);
+}
+
+/**
  * \brief creates Way from linestring.
  * 		  creates missing Nodes needed for Way and Way itself.
  * \param ogr_ls linestring which provides the geometry.
  * \param z_level_map holds z_levels to Nodes of Ways.
  */
 void process_way(OGRLineString *ogr_ls, z_lvl_map *z_level_map) {
-    std::map < osmium::Location, osmium::unsigned_object_id_type > node_ref_map;
+    std::map<osmium::Location, osmium::unsigned_object_id_type> node_ref_map;
 
     // creates remaining nodes required for way
     for (int i = 1; i < ogr_ls->getNumPoints() - 1; i++) {
@@ -487,8 +526,24 @@ void process_way(OGRLineString *ogr_ls, z_lvl_map *z_level_map) {
     if (it == z_level_map->end()) {
         osmium::unsigned_object_id_type way_id = create_way_with_tag_list(ogr_ls, &node_ref_map);
         offset_map.set(way_id, m_buffer.commit());
-    } else
+    } else {
+        // if first node has z_lvl != 0 then we need to create an extra node
+        std::pair<ushort, z_lvl_type> first = it->second.at(0);
+        ushort first_index = first.first;
+        z_lvl_type first_z_lvl = first.second;
+        if (first_index == 0 && first_z_lvl != 0)
+            process_first_end_point(first_index, first_z_lvl, ogr_ls, z_level_map, node_ref_map);
+
+        // if last node has z_lvl != 0 then we need to create an extra node
+        auto last = it->second.at(it->second.size() - 1);
+        auto last_index = last.first;
+        auto last_z_lvl = last.second;
+        if (last_index == it->second.size() - 1 && last_z_lvl != 0)
+            process_last_end_point(last_index, last_z_lvl, ogr_ls, z_level_map, node_ref_map);
+
+        m_buffer.commit();
         split_way_by_z_level(ogr_ls, &it->second, &node_ref_map, link_id);
+    }
 }
 
 // \brief writes way end node to way_end_points_map.
@@ -509,7 +564,7 @@ z_lvl_map process_z_levels(DBFHandle handle) {
     z_lvl_map z_level_map;
 
     uint64_t last_link_id;
-    std::vector<std::pair<ushort, short>> v;
+    std::vector<std::pair<ushort, z_lvl_type>> v;
 
     for (int i = 0; i < DBFGetRecordCount(handle); i++) {
         uint64_t link_id = dbf_get_int_by_field(handle, i, LINK_ID);
@@ -519,7 +574,7 @@ z_lvl_map process_z_levels(DBFHandle handle) {
 
         if (i > 0 && last_link_id != link_id && v.size() > 0) {
             z_level_map.insert(std::make_pair(last_link_id, v));
-            v = std::vector<std::pair<ushort, short>>();
+            v = std::vector<std::pair<ushort, z_lvl_type>>();
         }
         if (z_level != 0) v.push_back(std::make_pair(point_num, z_level));
         last_link_id = link_id;
@@ -643,26 +698,38 @@ void process_meta_areas(DBFHandle handle) {
  * \param handle DBF file handle to navteq manoeuvres.
  * */
 
-void process_turn_restrictions(DBFHandle handle) {
-    for (int i = 0; i < DBFGetRecordCount(handle); i++) {
+void process_turn_restrictions(DBFHandle rdms_handle, DBFHandle cdms_handle) {
+    // maps COND_ID to COND_TYPE
+    std::map<osmium::unsigned_object_id_type, ushort> cdms_map;
+    for (int i = 0; i < DBFGetRecordCount(cdms_handle); i++) {
+        osmium::unsigned_object_id_type cond_id = dbf_get_int_by_field(cdms_handle, i, COND_ID);
+        ushort cond_type = dbf_get_int_by_field(cdms_handle, i, COND_TYPE);
+        cdms_map.insert(std::make_pair(cond_id, cond_type));
+    }
 
-        uint64_t link_id = dbf_get_int_by_field(handle, i, LINK_ID);
+    for (int i = 0; i < DBFGetRecordCount(rdms_handle); i++) {
+
+        uint64_t link_id = dbf_get_int_by_field(rdms_handle, i, LINK_ID);
+        osmium::unsigned_object_id_type cond_id = dbf_get_int_by_field(rdms_handle, i, COND_ID);
+
+        auto it = cdms_map.find(cond_id);
+        if (it != cdms_map.end() && it->second != RESTRICTED_DRIVING_MANOEUVRE) continue;
+
         std::vector < uint64_t > via_manoeuvre_link_id;
 
         int j;
         via_manoeuvre_link_id.push_back(link_id);
         for (j = 0;; j++) {
-            if (i + j == DBFGetRecordCount(handle)) {
+            if (i + j == DBFGetRecordCount(rdms_handle)) {
                 i += j - 1;
                 break;
             }
-            osmium::unsigned_object_id_type cond_id = dbf_get_int_by_field(handle, i, COND_ID);
-            osmium::unsigned_object_id_type next_cond_id = dbf_get_int_by_field(handle, i + j, COND_ID);
+            osmium::unsigned_object_id_type next_cond_id = dbf_get_int_by_field(rdms_handle, i + j, COND_ID);
             if (cond_id != next_cond_id) {
                 i += j - 1;
                 break;
             }
-            via_manoeuvre_link_id.push_back(dbf_get_int_by_field(handle, i + j, MAN_LINKID));
+            via_manoeuvre_link_id.push_back(dbf_get_int_by_field(rdms_handle, i + j, MAN_LINKID));
         }
 
         std::vector < osmium::unsigned_object_id_type > via_manoeuvre_osm_id;

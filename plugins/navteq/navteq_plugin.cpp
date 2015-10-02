@@ -62,7 +62,7 @@ void navteq_plugin::execute() {
     add_street_shape_to_osmium(read_shape_file(input_path + STREETS_SHP), input_path);
     assert__id_uniqueness();
 
-    process_turn_restrictions(read_dbf_file(input_path + RDMS_DBF));
+    process_turn_restrictions(read_dbf_file(input_path + RDMS_DBF), read_dbf_file(input_path + CDMS_DBF));
     assert__id_uniqueness();
 
 //    assert__node_locations_uniqueness();
