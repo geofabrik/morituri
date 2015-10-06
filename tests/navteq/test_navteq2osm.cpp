@@ -120,7 +120,7 @@ TEST_CASE("split subway", "[split subway]") {
             if (obj->type() == osmium::item_type::way) {
                 CAPTURE(test.z_lvls);
 
-                const char* osm_z_lvl = obj->get_value_by_key("level");
+                const char* osm_z_lvl = obj->get_value_by_key("layer");
                 CAPTURE(osm_z_lvl);
                 CAPTURE(std::stoi(osm_z_lvl));
                 CAPTURE(test.supposed_way_z_lvls.at(ctr));
