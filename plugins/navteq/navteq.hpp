@@ -596,7 +596,7 @@ void process_admin_boundaries() {
     std::vector<std::pair<osmium::Location, osmium::unsigned_object_id_type>> osm_way_node_ids;
     for (int i = 0; i < ring->getNumPoints(); i++) {
         osmium::Location location(ring->getX(i), ring->getY(i));
-        osm_way_node_ids.push_back(std::make_pair(location, get_node(location)));
+        osm_way_node_ids.push_back(std::make_pair(location, build_node(location)));
     }
 
     std::vector < osmium::unsigned_object_id_type > osm_way_ids;
