@@ -196,7 +196,7 @@ uint64_t build_tag_list(osmium::builder::Builder* builder, short z_level = -5) {
         parse_street_tag(&tl_builder, field_name, field_value);
     }
 
-    if (z_level != -5) tl_builder.add_tag("level", std::to_string(z_level).c_str());
+    if (z_level != -5) tl_builder.add_tag("layer", std::to_string(z_level).c_str());
     if (link_id == 0) throw(format_error("layers column field '" + std::string(LINK_ID) + "' is missing"));
     return link_id;
 }
