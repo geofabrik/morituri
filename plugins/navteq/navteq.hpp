@@ -54,23 +54,23 @@ typedef std::map<uint64_t, std::vector<std::pair<ushort, z_lvl_type>>>z_lvl_map;
 static constexpr int buffer_size = 10 * 1000 * 1000;
 
 // maps location of way end nodes to node ids
-node_map way_end_points_map;
+node_map g_way_end_points_map;
 
 typedef std::pair<osmium::Location, z_lvl_type> node_id_type;
 
-std::map<node_id_type, osmium::unsigned_object_id_type> z_lvl_nodes_map;
+std::map<node_id_type, osmium::unsigned_object_id_type> g_z_lvl_nodes_map;
 
 // stores osm objects, grows if needed.
 osmium::memory::Buffer m_buffer(buffer_size);
 
 // id counter for object creation
-osmium::unsigned_object_id_type osm_id = 1;
+osmium::unsigned_object_id_type g_osm_id = 1;
 
 // id_mmap multimap maps navteq link_ids to osm_ids.
-std::multimap<uint64_t, osmium::unsigned_object_id_type> link_id_mmap;
+std::multimap<uint64_t, osmium::unsigned_object_id_type> g_link_id_mmap;
 
 // Provides access to elements in m_buffer through offsets
-osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, size_t> offset_map;
+osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, size_t> g_offset_map;
 
 // data structure to store admin boundary tags
 struct mtd_area_dataset {
@@ -116,22 +116,22 @@ void add_common_node_as_via(std::vector<osmium::unsigned_object_id_type>* osm_id
     osmium::builder::RelationMemberListBuilder& rml_builder) {
     assert(osm_ids->size() == 2);
 
-    const osmium::Way &from_way = m_buffer.get<const osmium::Way>(offset_map.get(osm_ids->at(0)));
+    const osmium::Way &from_way = m_buffer.get<const osmium::Way>(g_offset_map.get(osm_ids->at(0)));
     auto from_way_front = from_way.nodes().front().location();
     auto from_way_back = from_way.nodes().back().location();
 
-    const osmium::Way &to_way = m_buffer.get<const osmium::Way>(offset_map.get(osm_ids->at(1)));
+    const osmium::Way &to_way = m_buffer.get<const osmium::Way>(g_offset_map.get(osm_ids->at(1)));
     auto to_way_front = to_way.nodes().front().location();
     auto to_way_back = to_way.nodes().back().location();
 
     if (from_way_front == to_way_front) rml_builder.add_member(osmium::item_type::node,
-            way_end_points_map.at(from_way_front), "via");
+            g_way_end_points_map.at(from_way_front), "via");
     else if (from_way_front == to_way_back) rml_builder.add_member(osmium::item_type::node,
-            way_end_points_map.at(from_way_front), "via");
+            g_way_end_points_map.at(from_way_front), "via");
     else if (from_way_back == to_way_front) rml_builder.add_member(osmium::item_type::node,
-            way_end_points_map.at(from_way_back), "via");
+            g_way_end_points_map.at(from_way_back), "via");
     else {
-        rml_builder.add_member(osmium::item_type::node, way_end_points_map.at(from_way_back), "via");
+        rml_builder.add_member(osmium::item_type::node, g_way_end_points_map.at(from_way_back), "via");
         assert(from_way_back == to_way_back);
     }
 }
@@ -147,7 +147,7 @@ void add_common_node_as_via(std::vector<osmium::unsigned_object_id_type>* osm_id
 size_t write_turn_restriction(std::vector<osmium::unsigned_object_id_type> *osm_ids) {
 
     osmium::builder::RelationBuilder builder(m_buffer);
-    STATIC_RELATION(builder.object()).set_id(std::to_string(osm_id++).c_str());
+    STATIC_RELATION(builder.object()).set_id(std::to_string(g_osm_id++).c_str());
     set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
     builder.add_user(USER);
 
@@ -209,7 +209,7 @@ uint64_t build_tag_list(osmium::builder::Builder* builder, short z_level = -5) {
  * */
 osmium::unsigned_object_id_type build_node(osmium::Location location, osmium::builder::NodeBuilder* builder) {
     assert(builder != nullptr);
-    STATIC_NODE(builder->object()).set_id(osm_id++);
+    STATIC_NODE(builder->object()).set_id(g_osm_id++);
     set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder->object()));
     builder->add_user(USER);
     STATIC_NODE(builder->object()).set_location(location);
@@ -232,8 +232,8 @@ osmium::unsigned_object_id_type build_node(osmium::Location location) {
  * \return id of found or created Node.
  */
 osmium::unsigned_object_id_type get_node(osmium::Location location) {
-    auto it = way_end_points_map.find(location);
-    if (it != way_end_points_map.end()) return it->second;
+    auto it = g_way_end_points_map.find(location);
+    if (it != g_way_end_points_map.end()) return it->second;
     return build_node(location);
 }
 
@@ -268,7 +268,7 @@ osmium::unsigned_object_id_type create_way_with_tag_list(OGRLineString* ogr_ls, 
     if (is_sub_linestring) test__z_lvl_range(z_lvl);
 
     osmium::builder::WayBuilder builder(m_buffer);
-    STATIC_WAY(builder.object()).set_id(osm_id++);
+    STATIC_WAY(builder.object()).set_id(g_osm_id++);
     set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
 
     builder.add_user(USER);
@@ -279,14 +279,14 @@ osmium::unsigned_object_id_type create_way_with_tag_list(OGRLineString* ogr_ls, 
         std::map < osmium::Location, osmium::unsigned_object_id_type > *map_containing_node;
         if (!is_sub_linestring) {
             if (is_end_point)
-                map_containing_node = &way_end_points_map;
+                map_containing_node = &g_way_end_points_map;
             else
                 map_containing_node = node_ref_map;
         } else {
             if (node_ref_map->find(location) != node_ref_map->end())
                 map_containing_node = node_ref_map;
-            else if (way_end_points_map.find(location) != way_end_points_map.end())
-                map_containing_node = &way_end_points_map;
+            else if (g_way_end_points_map.find(location) != g_way_end_points_map.end())
+                map_containing_node = &g_way_end_points_map;
             else
                 assert(false); // node has to be in node_ref_map or way_end_points_map
         }
@@ -294,7 +294,7 @@ osmium::unsigned_object_id_type create_way_with_tag_list(OGRLineString* ogr_ls, 
     }
     uint64_t link_id = build_tag_list(&builder, z_lvl);
     assert(link_id != 0);
-    link_id_mmap.insert(std::make_pair(link_id, (osmium::unsigned_object_id_type) STATIC_WAY(builder.object()).id()));
+    g_link_id_mmap.insert(std::make_pair(link_id, (osmium::unsigned_object_id_type) STATIC_WAY(builder.object()).id()));
 
     return STATIC_WAY(builder.object()).id();
 }
@@ -349,7 +349,7 @@ void create_sub_way_by_index(ushort start_index, ushort end_index, OGRLineString
         short z_lvl = 0) {
     OGRLineString ogr_sub_ls = create_ogr_sublinestring(ogr_ls, start_index, end_index);
     osmium::unsigned_object_id_type way_id = create_way_with_tag_list(&ogr_sub_ls, node_ref_map, true, z_lvl);
-    offset_map.set(way_id, m_buffer.commit());
+    g_offset_map.set(way_id, m_buffer.commit());
 }
 
 /**
@@ -480,15 +480,15 @@ void process_end_point(bool first, ushort end_point_index, z_lvl_type end_point_
         z_lvl_map *z_level_map, std::map<osmium::Location, osmium::unsigned_object_id_type> & node_ref_map) {
     ushort i = first ? 0 : ogr_ls->getNumPoints() - 1;
     osmium::Location location(ogr_ls->getX(i), ogr_ls->getY(i));
-    auto it2 = z_lvl_nodes_map.find(std::make_pair(location, end_point_z_lvl));
-    if (it2 != z_lvl_nodes_map.end()){
+    auto it2 = g_z_lvl_nodes_map.find(std::make_pair(location, end_point_z_lvl));
+    if (it2 != g_z_lvl_nodes_map.end()){
         osmium::unsigned_object_id_type osm_id = it2->second;
         node_ref_map.insert(std::make_pair(location, osm_id));
     } else {
         osmium::unsigned_object_id_type osm_id = build_node(location);
         node_ref_map.insert(std::make_pair(location, osm_id));
         node_id_type node_id = std::make_pair(location, end_point_z_lvl);
-        z_lvl_nodes_map.insert(std::make_pair(node_id, osm_id));
+        g_z_lvl_nodes_map.insert(std::make_pair(node_id, osm_id));
     }
 }
 
@@ -525,7 +525,7 @@ void process_way(OGRLineString *ogr_ls, z_lvl_map *z_level_map) {
     auto it = z_level_map->find(link_id);
     if (it == z_level_map->end()) {
         osmium::unsigned_object_id_type way_id = create_way_with_tag_list(ogr_ls, &node_ref_map);
-        offset_map.set(way_id, m_buffer.commit());
+        g_offset_map.set(way_id, m_buffer.commit());
     } else {
         // if first node has z_lvl != 0 then we need to create an extra node
         std::pair<ushort, z_lvl_type> first = it->second.at(0);
@@ -548,7 +548,7 @@ void process_way(OGRLineString *ogr_ls, z_lvl_map *z_level_map) {
 
 // \brief writes way end node to way_end_points_map.
 void process_way_end_node(osmium::Location location) {
-    init_map_at_element(&way_end_points_map, location, get_node(location));
+    init_map_at_element(&g_way_end_points_map, location, get_node(location));
 }
 
 // \brief gets end nodes of linestring and processes them.
@@ -580,7 +580,6 @@ z_lvl_map process_z_levels(DBFHandle handle) {
         last_link_id = link_id;
     }
     if (v.size() > 0) z_level_map.insert(std::make_pair(last_link_id, v));
-//	print_z_level_map();
     return z_level_map;
 }
 
@@ -603,7 +602,7 @@ void process_admin_boundaries() {
     int i = 0;
     do {
         osmium::builder::WayBuilder builder(m_buffer);
-        STATIC_WAY(builder.object()).set_id(osm_id++);
+        STATIC_WAY(builder.object()).set_id(g_osm_id++);
         set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
         builder.add_user(USER);
         osmium::builder::WayNodeListBuilder wnl_builder(m_buffer, &builder);
@@ -614,7 +613,7 @@ void process_admin_boundaries() {
     } while (i < osm_way_node_ids.size());
 
     osmium::builder::RelationBuilder builder(m_buffer);
-    STATIC_RELATION(builder.object()).set_id(osm_id++);
+    STATIC_RELATION(builder.object()).set_id(g_osm_id++);
     set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
     builder.add_user(USER);
 
@@ -736,10 +735,10 @@ void process_turn_restrictions(DBFHandle rdms_handle, DBFHandle cdms_handle) {
         bool complete = true;
 
         for (auto it : via_manoeuvre_link_id) {
-            auto range = link_id_mmap.equal_range(it);
+            auto range = g_link_id_mmap.equal_range(it);
             if (range.first == range.second) {
                 complete = false;
-                std::cerr << "link_id " << it << " is missing in Streets.dbf" << std::endl;
+//                std::cerr << "link_id " << it << " is missing in Streets.dbf" << std::endl;
                 break;
             }
             for (auto it2 = range.first; it2 != range.second; ++it2) {
@@ -840,9 +839,9 @@ void add_admin_shape_to_osmium(OGRLayer *layer, std::string dir = std::string(),
 
 void clear_all() {
     int cleared = m_buffer.clear();
-    osm_id = 1;
-    link_id_mmap.clear();
-    offset_map.clear();
+    g_osm_id = 1;
+    g_link_id_mmap.clear();
+    g_offset_map.clear();
     mtd_area_map.clear();
 }
 
