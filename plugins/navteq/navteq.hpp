@@ -66,8 +66,8 @@ osmium::memory::Buffer m_buffer(buffer_size);
 // id counter for object creation
 osmium::unsigned_object_id_type g_osm_id = 1;
 
-// id_mmap multimap maps navteq link_ids to osm_ids.
-std::multimap<uint64_t, osmium::unsigned_object_id_type> g_link_id_mmap;
+// g_link_id_map maps navteq link_ids to a vector of osm_ids (it will mostly map to a single osm_id)
+std::map<uint64_t, std::vector<osmium::unsigned_object_id_type>> g_link_id_map;
 
 // Provides access to elements in m_buffer through offsets
 osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, size_t> g_offset_map;
@@ -294,7 +294,9 @@ osmium::unsigned_object_id_type create_way_with_tag_list(OGRLineString* ogr_ls, 
     }
     uint64_t link_id = build_tag_list(&builder, z_lvl);
     assert(link_id != 0);
-    g_link_id_mmap.insert(std::make_pair(link_id, (osmium::unsigned_object_id_type) STATIC_WAY(builder.object()).id()));
+    if (g_link_id_map.find(link_id) == g_link_id_map.end())
+        g_link_id_map.insert(std::make_pair(link_id, std::vector<osmium::unsigned_object_id_type>()));
+    g_link_id_map.at(link_id).push_back((osmium::unsigned_object_id_type) STATIC_WAY(builder.object()).id());
 
     return STATIC_WAY(builder.object()).id();
 }
@@ -707,6 +709,88 @@ void process_meta_areas(DBFHandle handle) {
     DBFClose(handle);
 }
 
+std::vector<uint64_t> collect_via_manoeuvre_link_ids(uint64_t link_id, DBFHandle rdms_handle,
+        osmium::unsigned_object_id_type cond_id, int& i) {
+    std::vector<uint64_t> via_manoeuvre_link_id;
+    via_manoeuvre_link_id.push_back(link_id);
+    for (int j = 0;; j++) {
+        if (i + j == DBFGetRecordCount(rdms_handle)) {
+            i += j - 1;
+            break;
+        }
+        osmium::unsigned_object_id_type next_cond_id = dbf_get_int_by_field(rdms_handle, i + j, COND_ID);
+        if (cond_id != next_cond_id) {
+            i += j - 1;
+            break;
+        }
+        via_manoeuvre_link_id.push_back(dbf_get_int_by_field(rdms_handle, i + j, MAN_LINKID));
+    }
+    return via_manoeuvre_link_id;
+}
+
+std::vector<osmium::unsigned_object_id_type> collect_via_manoeuvre_osm_ids(
+        const std::vector<uint64_t>& via_manoeuvre_link_id) {
+    std::vector<osmium::unsigned_object_id_type> via_manoeuvre_osm_id;
+
+    osmium::Location end_point_front;
+    osmium::Location end_point_back;
+    osmium::Location curr;
+    uint ctr = 0;
+
+    for (auto it : via_manoeuvre_link_id) {
+        bool reverse = false;
+
+        if (g_link_id_map.find(it) == g_link_id_map.end()) return std::vector<osmium::unsigned_object_id_type>();
+
+        std::vector<long unsigned int> &osm_id_vector = g_link_id_map.at(it);
+        auto first_osm_id = osm_id_vector.at(0);
+        const auto &first_way = m_buffer.get<const osmium::Way>(g_offset_map.get(first_osm_id));
+        osmium::Location first_way_front = first_way.nodes().front().location();
+        auto last_osm_id = osm_id_vector.at(osm_id_vector.size()-1);
+        const auto &last_way = m_buffer.get<const osmium::Way>(g_offset_map.get(last_osm_id));
+        osmium::Location last_way_back = last_way.nodes().back().location();
+
+        // determine end_points
+        if (ctr == 0){
+            // assume this is correct
+            end_point_front = first_way_front;
+            end_point_back  = last_way_back;
+        } else {
+            if (ctr == 1) {
+                // checks wether assumption is valid and corrects it if necessary
+                if (end_point_front == first_way_front || end_point_front == last_way_back) {
+                    // reverse via_manoeuvre_osm_id
+                    std::reverse(via_manoeuvre_osm_id.begin(), via_manoeuvre_osm_id.end());
+                    // switch end_points
+                    auto tmp = end_point_front;
+                    end_point_front = end_point_back;
+                    end_point_back = tmp;
+                }
+            }
+            // detemine new end_point
+            if (end_point_back == last_way_back)
+                end_point_back = first_way_front;
+            else if (end_point_back == first_way_front)
+                end_point_back = last_way_back;
+            else assert(false);
+        }
+
+        // check wether we have to reverse vector
+        if (osm_id_vector.size() > 1) {
+            if (end_point_back == first_way_front) reverse = true;
+            else
+            assert(end_point_back == last_way_back);
+        }
+        if (reverse)
+            via_manoeuvre_osm_id.insert(via_manoeuvre_osm_id.end(), osm_id_vector.rbegin(), osm_id_vector.rend());
+        else
+            via_manoeuvre_osm_id.insert(via_manoeuvre_osm_id.end(), osm_id_vector.begin(), osm_id_vector.end());
+
+        ctr++;
+    } // end link_id loop
+    return via_manoeuvre_osm_id;
+}
+
 /**
  * \brief reads turn restrictions from DBF file and writes them to osmium.
  * \param handle DBF file handle to navteq manoeuvres.
@@ -729,39 +813,13 @@ void process_turn_restrictions(DBFHandle rdms_handle, DBFHandle cdms_handle) {
         auto it = cdms_map.find(cond_id);
         if (it != cdms_map.end() && it->second != RESTRICTED_DRIVING_MANOEUVRE) continue;
 
-        std::vector < uint64_t > via_manoeuvre_link_id;
+        std::vector<uint64_t> via_manoeuvre_link_id = collect_via_manoeuvre_link_ids(link_id, rdms_handle, cond_id, i);
 
-        int j;
-        via_manoeuvre_link_id.push_back(link_id);
-        for (j = 0;; j++) {
-            if (i + j == DBFGetRecordCount(rdms_handle)) {
-                i += j - 1;
-                break;
-            }
-            osmium::unsigned_object_id_type next_cond_id = dbf_get_int_by_field(rdms_handle, i + j, COND_ID);
-            if (cond_id != next_cond_id) {
-                i += j - 1;
-                break;
-            }
-            via_manoeuvre_link_id.push_back(dbf_get_int_by_field(rdms_handle, i + j, MAN_LINKID));
-        }
+        std::vector<osmium::unsigned_object_id_type> via_manoeuvre_osm_id = collect_via_manoeuvre_osm_ids(
+                via_manoeuvre_link_id);
 
-        std::vector < osmium::unsigned_object_id_type > via_manoeuvre_osm_id;
-        bool complete = true;
-
-        for (auto it : via_manoeuvre_link_id) {
-            auto range = g_link_id_mmap.equal_range(it);
-            if (range.first == range.second) {
-                complete = false;
-//                std::cerr << "link_id " << it << " is missing in Streets.dbf" << std::endl;
-                break;
-            }
-            for (auto it2 = range.first; it2 != range.second; ++it2) {
-                via_manoeuvre_osm_id.push_back(it2->second);
-            }
-        }
         // only process complete turn relations
-        if (!complete) continue;
+        if (via_manoeuvre_osm_id.empty()) continue;
 
 //			// get corresponding osm_way to link
 //			const Way &way = m_buffer.get<const Way>(offset_map.get(osm_id));
@@ -858,7 +916,7 @@ void add_admin_shape_to_osmium(OGRLayer *layer, std::string dir = std::string(),
 void clear_all() {
     int cleared = m_buffer.clear();
     g_osm_id = 1;
-    g_link_id_mmap.clear();
+    g_link_id_map.clear();
     g_offset_map.clear();
     mtd_area_map.clear();
 }
