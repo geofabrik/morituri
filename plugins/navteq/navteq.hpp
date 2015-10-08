@@ -608,12 +608,18 @@ void process_admin_boundaries() {
 
     // todo handle interior rings
 
+    node_map admin_nodes;
+
     // create nodes for admin boundaries
     std::vector<std::pair<osmium::Location, osmium::unsigned_object_id_type>> osm_way_node_ids;
-    for (int i = 0; i < ring->getNumPoints(); i++) {
+    for (int i = 0; i < ring->getNumPoints()-1; i++) {
         osmium::Location location(ring->getX(i), ring->getY(i));
-        osm_way_node_ids.push_back(std::make_pair(location, build_node(location)));
+        auto osm_id = build_node(location);
+        osm_way_node_ids.push_back(std::make_pair(location, osm_id));
+        admin_nodes.insert(std::make_pair(location, osm_id));
     }
+    osmium::Location location(ring->getX(ring->getNumPoints()-1), ring->getY(ring->getNumPoints()-1));
+    osm_way_node_ids.push_back(std::make_pair(location, admin_nodes.at(location)));
 
     std::vector < osmium::unsigned_object_id_type > osm_way_ids;
     int i = 0;
