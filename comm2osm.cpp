@@ -18,20 +18,16 @@ std::string input_path, output_path;
 void print_help() {
     std::cout << "comm2osm [OPTIONS] [INFILE [OUTFILE]]\n\n"
             << "If INFILE or OUTFILE is not given stdin/stdout is assumed.\n"
-            << "File format is autodetected from file name suffix.\n";
-//			<< "Use -f and -t options to force file format.\n"
-//			<< "\nFile types:\n" << "  osm        normal OSM file\n"
-//			<< "  osc        OSM change file\n"
-//			<< "  osh        OSM file with history information\n"
-//			<< "\nFile format:\n" << "  (default)  XML encoding\n"
-//			<< "  pbf        binary PBF encoding\n"
-//			<< "  opl        OPL encoding\n" << "\nFile compression\n"
-//			<< "  gz         compressed with gzip\n"
-//			<< "  bz2        compressed with bzip2\n"
-//			<< "\nOptions:\n"
-//			<< "  -h, --help                This help message\n"
-//			<< "  -f, --from-format=FORMAT  Input format\n"
-//			<< "  -t, --to-format=FORMAT    Output format\n";
+            << "File format is autodetected from file name suffix.\n"
+//			<< "Use -t option to force file format.\n"
+			<< "\nFile format:\n" << "  (default)  XML encoding\n"
+			<< "  pbf        binary PBF encoding\n"
+			<< "  opl        OPL encoding\n" << "\nFile compression\n"
+			<< "  gz         compressed with gzip\n"
+			<< "  bz2        compressed with bzip2\n"
+			<< "\nOptions:\n"
+			<< "  -h, --help                This help message\n"
+			<< "  -t, --to-format=FORMAT    Output format\n";
 }
 
 void check_args_and_setup(int argc, char* argv[]) {
