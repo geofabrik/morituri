@@ -46,9 +46,14 @@ bool navteq_plugin::check_input(const char* input_path, const char* output_file)
     }
 
     if (!shp_file_exists(input_path + STREETS_SHP)) return false;
-    if (!dbf_file_exists(input_path + RDMS_DBF)) return false;
-    if (!dbf_file_exists(input_path + ZLEVELS_DBF)) return false;
+    if (!shp_file_exists(input_path + ADMINBNDY_2_SHP)) return false;
+    if (!shp_file_exists(input_path + ADMINBNDY_3_SHP)) return false;
+    if (!shp_file_exists(input_path + ADMINBNDY_4_SHP)) return false;
+
     if (!dbf_file_exists(input_path + MTD_AREA_DBF)) return false;
+    if (!dbf_file_exists(input_path + RDMS_DBF)) return false;
+    if (!dbf_file_exists(input_path + CDMS_DBF)) return false;
+    if (!dbf_file_exists(input_path + ZLEVELS_DBF)) return false;
 
     this->plugin_setup(input_path, output_file);
     return true;
