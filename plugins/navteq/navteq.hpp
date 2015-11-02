@@ -124,13 +124,29 @@ void add_common_node_as_via(std::vector<osmium::unsigned_object_id_type>* osm_id
     auto to_way_front = to_way.nodes().front().location();
     auto to_way_back = to_way.nodes().back().location();
 
-    if (from_way_front == to_way_front) rml_builder.add_member(osmium::item_type::node,
-            g_way_end_points_map.at(from_way_front), "via");
-    else if (from_way_front == to_way_back) rml_builder.add_member(osmium::item_type::node,
-            g_way_end_points_map.at(from_way_front), "via");
-    else if (from_way_back == to_way_front) rml_builder.add_member(osmium::item_type::node,
-            g_way_end_points_map.at(from_way_back), "via");
-    else {
+    if (from_way_front == to_way_front) {
+        if (g_way_end_points_map.find(from_way_front) == g_way_end_points_map.end()) {
+            std::cerr << "Skipping via node: " << from_way_front << " is not in g_way_end_points_map." << std::endl;
+            return;
+        }
+        rml_builder.add_member(osmium::item_type::node, g_way_end_points_map.at(from_way_front), "via");
+    } else if (from_way_front == to_way_back) {
+        if (g_way_end_points_map.find(from_way_front) == g_way_end_points_map.end())  {
+            std::cerr << "Skipping via node: " << from_way_front << " is not in g_way_end_points_map." << std::endl;
+            return;
+        }
+        rml_builder.add_member(osmium::item_type::node, g_way_end_points_map.at(from_way_front), "via");
+    } else if (from_way_back == to_way_front) {
+        if (g_way_end_points_map.find(from_way_back) == g_way_end_points_map.end())  {
+            std::cerr << "Skipping via node: " << from_way_back << " is not in g_way_end_points_map." << std::endl;
+            return;
+        }
+        rml_builder.add_member(osmium::item_type::node, g_way_end_points_map.at(from_way_back), "via");
+    } else {
+        if (g_way_end_points_map.find(from_way_back) == g_way_end_points_map.end())  {
+            std::cerr << "Skipping via node: " << from_way_back << " is not in g_way_end_points_map." << std::endl;
+            return;
+        }
         rml_builder.add_member(osmium::item_type::node, g_way_end_points_map.at(from_way_back), "via");
         assert(from_way_back == to_way_back);
     }
