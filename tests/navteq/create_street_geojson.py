@@ -26,7 +26,31 @@ if __name__ == '__main__':
         "properties":{}
     },  
     "properties":{
-        "LINK_ID":"2147483647"
+        "LINK_ID":"2147483647",
+        "ST_NAME":"AN DER REUTHE",
+        "FUNC_CLASS":"1",
+        "FR_SPD_LIM":"100",
+        "TO_SPD_LIM":"100",
+        "DIR_TRAVEL":"T",
+        "AR_AUTO":"N",
+        "AR_BUS":"N",
+        "AR_TAXIS":"N",
+        "AR_CARPOOL":"N",
+        "AR_PEDEST":"N",
+        "AR_TRUCKS":"N",
+        "AR_TRAFF":"N",
+        "AR_DELIV":"N",
+        "AR_EMERVEH":"N",
+        "AR_MOTOR":"N",
+        "PAVED":"Y",
+        "PRIVATE":"Y",
+        "BRIDGE":"Y",
+        "TUNNEL":"Y",
+        "TOLLWAY":"Y",
+        "ROUNDABOUT":"N",
+        "FOURWHLDR":"N",
+        "PHYS_LANES":"1",
+        "PUB_ACCESS":"Y"
     }   
 }"""
     

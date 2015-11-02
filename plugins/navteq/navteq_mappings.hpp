@@ -20,6 +20,32 @@ const std::string RDMS_DBF = "Rdms.dbf";
 const std::string CDMS_DBF = "Cdms.dbf";
 const std::string ZLEVELS_DBF = "Zlevels.dbf";
 
+
+// STREETS columns
+const char* LINK_ID = "LINK_ID";
+const char* ST_NAME = "ST_NAME";
+const char* FUNC_CLASS = "FUNC_CLASS";
+const char* FR_SPEED_LIMIT = "FR_SPD_LIM";
+const char* TO_SPEED_LIMIT = "TO_SPD_LIM";
+const char* DIR_TRAVEL = "DIR_TRAVEL";
+const char* AR_AUTO = "AR_AUTO";
+const char* AR_BUS = "AR_BUS";
+const char* AR_TAXIS = "AR_TAXIS";
+const char* AR_CARPOOL = "AR_CARPOOL";
+const char* AR_PEDESTRIANS = "AR_PEDEST";
+const char* AR_EMERVEH = "AR_EMERVEH";
+const char* AR_MOTORCYCLES = "AR_MOTOR";
+const char* AR_THROUGH_TRAFFIC = "AR_TRAFF";
+const char* PAVED = "PAVED";
+const char* PRIVATE = "PRIVATE";
+const char* BRIDGE = "BRIDGE";
+const char* TUNNEL = "TUNNEL";
+const char* TOLLWAY = "TOLLWAY";
+const char* ROUNDABOUT = "ROUNDABOUT";
+const char* FOURWHLDR = "FOURWHLDR";
+const char* PHYS_LANES = "PHYS_LANES";
+const char* PUB_ACCESS = "PUB_ACCESS";
+
 // MTD_AREA_DBF columns
 const char* AREA_ID = "AREA_ID";
 const char* LANG_CODE = "LANG_CODE";

@@ -194,23 +194,9 @@ size_t write_turn_restriction(std::vector<osmium::unsigned_object_id_type> *osm_
  */
 
 uint64_t build_tag_list(osmium::builder::Builder* builder, short z_level = -5) {
-    uint64_t link_id = 0;
     osmium::builder::TagListBuilder tl_builder(m_buffer, builder);
 
-    for (int i = 0; i < cur_layer->GetLayerDefn()->GetFieldCount(); i++) {
-        OGRFieldDefn* field_definition = cur_layer->GetLayerDefn()->GetFieldDefn(i);
-        const char* field_name = field_definition->GetNameRef();
-        const char* field_value = cur_feat->GetFieldAsString(i);
-
-        if (!strcmp(field_name, LINK_ID)) {
-            tl_builder.add_tag(field_name, field_value);
-            link_id = std::stoul(field_value);
-            continue;
-        }
-
-        // decode fields of shapefile into osm format
-        parse_street_tag(&tl_builder, field_name, field_value);
-    }
+    uint64_t link_id = parse_street_tags(&tl_builder, cur_feat);
 
     if (z_level != -5) tl_builder.add_tag("layer", std::to_string(z_level).c_str());
     if (link_id == 0) throw(format_error("layers column field '" + std::string(LINK_ID) + "' is missing"));

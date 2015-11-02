@@ -94,6 +94,7 @@ uint64_t dbf_get_int_by_field(DBFHandle handle, int row, const char *field_name)
 const char* get_field_from_feature(OGRFeature* feat, const char* field) {
     assert(feat);
     int field_index = feat->GetFieldIndex(field);
+    if (field_index == -1) std::cerr << field << std::endl;
     assert(field_index != -1);
     return feat->GetFieldAsString(field_index);
 }

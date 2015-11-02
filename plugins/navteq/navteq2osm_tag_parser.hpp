@@ -25,7 +25,7 @@ bool parse_bool(const char* value) {
 }
 
 // match 'functional class' to 'highway' tag
-void add_highway_tag(const char* value, osmium::builder::TagListBuilder* builder) {
+void add_highway_tag(osmium::builder::TagListBuilder* builder, const char* value) {
     const char* highway = "highway";
 
     switch (std::stoi(value)) {
@@ -60,30 +60,21 @@ const char* parse_one_way_tag(const char* value) {
     throw(format_error("value '" + std::string(value) + "' for oneway not valid"));
 }
 
-void add_one_way_tag(const char* value, osmium::builder::TagListBuilder* builder) {
+void add_one_way_tag(osmium::builder::TagListBuilder* builder, const char* value) {
     const char* one_way = "oneway";
     const char* parsed_value = parse_one_way_tag(value);
     builder->add_tag(one_way, parsed_value);
 }
 
-void add_access_tags(const char* field, const char* value, osmium::builder::TagListBuilder* builder) {
-    const char* osm_value = parse_bool(value) ? YES : NO;
-    if (!strcmp(field, "AR_AUTO"))
-        builder->add_tag("motorcar", osm_value);
-    else if (!strcmp(field, "AR_BUS"))
-        builder->add_tag("bus", osm_value);
-    else if (!strcmp(field, "AR_TAXIS"))
-        builder->add_tag("taxi", osm_value);
-    else if (!strcmp(field, "AR_CARPOOLS"))
-        builder->add_tag("hov", osm_value);
-    else if (!strcmp(field, "AR_PEDESTRIANS"))
-        builder->add_tag("foot", osm_value);
-    //	else if (!strcmp(field, "AR_TRUCKS"))
-    else if (!strcmp(field, "AR_EMERVEH"))
-        builder->add_tag("emergency", osm_value);
-    else if (!strcmp(field, "AR_MOTORCYCLES"))
-        builder->add_tag("motorcycle", osm_value);
-    else if (!strcmp(field, "AR_THROUGHTRAFFIC") && !strcmp(osm_value, YES)) builder->add_tag("access", "destination");
+void add_access_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f) {
+    builder->add_tag("motorcar", parse_bool(get_field_from_feature(f, AR_AUTO)) ? YES : NO);
+    builder->add_tag("bus", parse_bool(get_field_from_feature(f, AR_BUS)) ? YES : NO);
+    builder->add_tag("taxi", parse_bool(get_field_from_feature(f, AR_TAXIS)) ? YES : NO);
+    builder->add_tag("hov", parse_bool(get_field_from_feature(f, AR_CARPOOL)) ? YES : NO);
+    builder->add_tag("foot", parse_bool(get_field_from_feature(f, AR_PEDESTRIANS)) ? YES : NO);
+    builder->add_tag("emergency", parse_bool(get_field_from_feature(f, AR_EMERVEH)) ? YES : NO);
+    builder->add_tag("motorcycle", parse_bool(get_field_from_feature(f, AR_MOTORCYCLES)) ? YES : NO);
+    if (parse_bool(get_field_from_feature(f, AR_THROUGH_TRAFFIC))) builder->add_tag("access", "destination");
 }
 
 /**
@@ -142,34 +133,34 @@ void add_tag_access_private(osmium::builder::TagListBuilder* builder) {
 
 /**
  * \brief maps navteq tags for access, tunnel, bridge, etc. to osm tags
+ * \return link id of processed feature.
  */
-void parse_street_tag(osmium::builder::TagListBuilder *builder, const char* field, const char* value) {
-    if (!strcmp(field, "FUNC_CLASS"))
-        add_highway_tag(value, builder);
-    else if (!strcmp(field, "ST_NAME"))
-        builder->add_tag("name", to_camel_case_with_spaces(value).c_str());
-    else if (!strcmp(field, "DIR_TRAVEL"))
-        add_one_way_tag(value, builder);
-    else if (!strncmp(field, "AR_", 3))
-        add_access_tags(field, value, builder);
-    else if (!strcmp(field, "PUB_ACCESS") && !parse_bool(value))
+uint64_t parse_street_tags(osmium::builder::TagListBuilder *builder, OGRFeature* f){
+    const char* link_id_s = get_field_from_feature(f, LINK_ID);
+    uint64_t link_id = std::stoul(link_id_s);
+    builder->add_tag(LINK_ID, link_id_s); // tag for debug purpose
+
+    builder->add_tag("name", to_camel_case_with_spaces(get_field_from_feature(f, ST_NAME)).c_str());
+    add_highway_tag(builder, get_field_from_feature(f, FUNC_CLASS));
+    add_one_way_tag(builder, get_field_from_feature(f, DIR_TRAVEL));
+    add_access_tags(builder, f);
+
+    if (!parse_bool(get_field_from_feature(f, PUB_ACCESS)) || parse_bool(get_field_from_feature(f, PRIVATE)))
         add_tag_access_private(builder);
-    else if (!strcmp(field, "PRIVATE") && parse_bool(value))
-        add_tag_access_private(builder);
-    else if (!strcmp(field, "PAVED") && parse_bool(value))
-        builder->add_tag("surface", "paved");
-    else if (!strcmp(field, "BRIDGE") && parse_bool(value))
-        builder->add_tag("bridge", YES);
-    else if (!strcmp(field, "TUNNEL") && parse_bool(value))
-        builder->add_tag("tunnel", YES);
-    else if (!strcmp(field, "TOLLWAY") && parse_bool(value))
-        builder->add_tag("toll", YES);
-    else if (!strcmp(field, "ROUNDABOUT") && parse_bool(value))
-        builder->add_tag("junction", "roundabout");
-    else if (!strcmp(field, "FOURWHLDR") && parse_bool(value))
-        builder->add_tag("4wd_only", YES);
-    else if (!strcmp(field, "PHYS_LANES") && strcmp(value, "0")) builder->add_tag("lanes", value);
+
+    if (parse_bool(get_field_from_feature(f, PAVED))) builder->add_tag("surface", "paved");
+    if (parse_bool(get_field_from_feature(f, BRIDGE))) builder->add_tag("bridge", YES);
+    if (parse_bool(get_field_from_feature(f, TUNNEL))) builder->add_tag("tunnel", YES);
+    if (parse_bool(get_field_from_feature(f, TOLLWAY))) builder->add_tag("toll", YES);
+    if (parse_bool(get_field_from_feature(f, ROUNDABOUT))) builder->add_tag("junction", "roundabout");
+    if (parse_bool(get_field_from_feature(f, FOURWHLDR))) builder->add_tag("4wd_only", YES);
+
+    const char* number_of_physical_lanes = get_field_from_feature(f, PHYS_LANES);
+    if( strcmp(number_of_physical_lanes, "0") ) builder->add_tag("lanes", number_of_physical_lanes);
+
+    return link_id;
 }
+
 
 // matching from http://www.loc.gov/standards/iso639-2/php/code_list.php
 // http://www.loc.gov/standards/iso639-2/ISO-639-2_utf-8.txt
