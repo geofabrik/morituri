@@ -263,7 +263,7 @@ void test__z_lvl_range(short z_lvl) {
  * \param z_lvl z-level of way. initially invalid (-5).
  * \return id of created Way.
  */
-osmium::unsigned_object_id_type create_way_with_tag_list(OGRLineString* ogr_ls, node_map *node_ref_map = nullptr,
+osmium::unsigned_object_id_type build_way(OGRLineString* ogr_ls, node_map *node_ref_map = nullptr,
         bool is_sub_linestring = false, short z_lvl = -5) {
     if (is_sub_linestring) test__z_lvl_range(z_lvl);
 
@@ -283,12 +283,13 @@ osmium::unsigned_object_id_type create_way_with_tag_list(OGRLineString* ogr_ls, 
             else
                 map_containing_node = node_ref_map;
         } else {
-            if (node_ref_map->find(location) != node_ref_map->end())
+            if (node_ref_map->find(location) != node_ref_map->end()) {
                 map_containing_node = node_ref_map;
-            else if (g_way_end_points_map.find(location) != g_way_end_points_map.end())
+            } else {
+                // node has to be in node_ref_map or way_end_points_map
+                assert(g_way_end_points_map.find(location) != g_way_end_points_map.end());
                 map_containing_node = &g_way_end_points_map;
-            else
-                assert(false); // node has to be in node_ref_map or way_end_points_map
+            }
         }
         add_way_node(location, wnl_builder, map_containing_node);
     }
@@ -308,7 +309,7 @@ osmium::unsigned_object_id_type create_way_with_tag_list(OGRLineString* ogr_ls, 
  * \param end_index Node index in ogr_ls, where sublinestring will end.
  * \return sublinestring from ogr_ls [start_index, end_index] inclusive
  */
-OGRLineString create_ogr_sublinestring(OGRLineString* ogr_ls, int start_index, int end_index = -1) {
+OGRLineString create_sublinestring_geometry(OGRLineString* ogr_ls, int start_index, int end_index = -1) {
     assert(start_index < end_index || end_index == -1);
     assert(start_index < ogr_ls->getNumPoints());
     OGRLineString ogr_sub_ls;
@@ -347,10 +348,10 @@ bool is_superior_or_equal(short superior, short than) {
  * \param node_ref_map provides osm_ids of Nodes to a given location.
  * \param z_lvl
  */
-void create_sub_way_by_index(ushort start_index, ushort end_index, OGRLineString* ogr_ls, node_map* node_ref_map,
+void build_sub_way_by_index(ushort start_index, ushort end_index, OGRLineString* ogr_ls, node_map* node_ref_map,
         short z_lvl = 0) {
-    OGRLineString ogr_sub_ls = create_ogr_sublinestring(ogr_ls, start_index, end_index);
-    osmium::unsigned_object_id_type way_id = create_way_with_tag_list(&ogr_sub_ls, node_ref_map, true, z_lvl);
+    OGRLineString ogr_sub_ls = create_sublinestring_geometry(ogr_ls, start_index, end_index);
+    osmium::unsigned_object_id_type way_id = build_way(&ogr_sub_ls, node_ref_map, true, z_lvl);
     g_offset_map.set(way_id, m_buffer.commit());
 }
 
@@ -414,12 +415,12 @@ ushort create_continuing_sub_ways(ushort first_index, ushort start_index, ushort
                 std::cout << " 2 ## " << link_id << " ## " << from << "/" << last_index << "  -  " << to << "/"
                         << last_index << ": \tz_lvl=" << z_lvl << std::endl;
             if (from < to) {
-                create_sub_way_by_index(from, to, ogr_ls, node_ref_map, z_lvl);
+                build_sub_way_by_index(from, to, ogr_ls, node_ref_map, z_lvl);
                 start_index = to;
             }
 
             if (not_last_element && to < next_index - 1) {
-                create_sub_way_by_index(to, next_index - 1, ogr_ls, node_ref_map);
+                build_sub_way_by_index(to, next_index - 1, ogr_ls, node_ref_map);
                 if (DEBUG)
                     std::cout << " 3 ## " << link_id << " ## " << to << "/" << last_index << "  -  " << next_index - 1
                             << "/" << last_index << ": \tz_lvl=" << 0 << std::endl;
@@ -452,7 +453,7 @@ void split_way_by_z_level(OGRLineString* ogr_ls, std::vector<std::pair<ushort, s
 //	if (DEBUG) print_z_level_map(link_id, true);
 
     if (first_index != start_index) {
-        create_sub_way_by_index(first_index, start_index, ogr_ls, node_ref_map);
+        build_sub_way_by_index(first_index, start_index, ogr_ls, node_ref_map);
         if (DEBUG)
             std::cout << " 1 ## " << link_id << " ## " << first_index << "/" << last_index << "  -  " << start_index
                     << "/" << last_index << ": \tz_lvl=" << 0 << std::endl;
@@ -462,7 +463,7 @@ void split_way_by_z_level(OGRLineString* ogr_ls, std::vector<std::pair<ushort, s
             node_ref_map);
 
     if (start_index < last_index) {
-        create_sub_way_by_index(start_index, last_index, ogr_ls, node_ref_map);
+        build_sub_way_by_index(start_index, last_index, ogr_ls, node_ref_map);
         if (DEBUG)
             std::cout << " 4 ## " << link_id << " ## " << start_index << "/" << last_index << "  -  " << last_index
                     << "/" << last_index << ": \tz_lvl=" << 0 << std::endl;
@@ -537,18 +538,15 @@ void process_way(OGRLineString *ogr_ls, z_lvl_map *z_level_map) {
 
     auto it = z_level_map->find(link_id);
     if (it == z_level_map->end()) {
-        osmium::unsigned_object_id_type way_id = create_way_with_tag_list(ogr_ls, &node_ref_map);
+        osmium::unsigned_object_id_type way_id = build_way(ogr_ls, &node_ref_map);
         g_offset_map.set(way_id, m_buffer.commit());
     } else {
         // way with different z_levels
-
         auto first_point_with_different_z_lvl = it->second.at(0);
         auto first_index = 0;
         z_lvl_type first_z_lvl;
-
         if (first_point_with_different_z_lvl.first == first_index) first_z_lvl = first_point_with_different_z_lvl.second;
         else first_z_lvl = 0;
-
         process_first_end_point(first_index, first_z_lvl, ogr_ls, z_level_map, node_ref_map);
 
         auto last_point_with_different_z_lvl = it->second.at(it->second.size() - 1);
@@ -559,6 +557,7 @@ void process_way(OGRLineString *ogr_ls, z_lvl_map *z_level_map) {
         process_last_end_point(last_index, last_z_lvl, ogr_ls, z_level_map, node_ref_map);
 
         m_buffer.commit();
+
         split_way_by_z_level(ogr_ls, &it->second, &node_ref_map, link_id);
     }
 }
