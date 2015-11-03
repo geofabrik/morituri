@@ -158,8 +158,12 @@ void add_maxspeed_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f) 
     const char* to = from_speed_limit == 999 ? "none" : to_speed_limit_s;
 
     if (from_speed_limit != 0 && to_speed_limit != 0) {
-        builder->add_tag("maxspeed:forward", from);
-        builder->add_tag("maxspeed:backward", to);
+        if (from_speed_limit != to_speed_limit) {
+            builder->add_tag("maxspeed:forward", from);
+            builder->add_tag("maxspeed:backward", to);
+        } else {
+            builder->add_tag("maxspeed", from);
+        }
     } else if (from_speed_limit != 0 && to_speed_limit == 0) {
         builder->add_tag("maxspeed", from);
     } else if (from_speed_limit == 0 && to_speed_limit != 0) {
