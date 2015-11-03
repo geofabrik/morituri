@@ -132,6 +132,44 @@ void add_tag_access_private(osmium::builder::TagListBuilder* builder) {
 }
 
 /**
+ * \brief adds maxspeed tag
+ */
+void add_maxspeed_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f) {
+    // debug
+    // builder->add_tag("FR_SPD_LIM", get_field_from_feature(f, FR_SPEED_LIMIT));
+    // builder->add_tag("TO_SPD_LIM", get_field_from_feature(f, TO_SPEED_LIMIT));
+
+    const char* from_speed_limit_s = strdup(get_field_from_feature(f, FR_SPEED_LIMIT));
+    const char* to_speed_limit_s = strdup(get_field_from_feature(f, TO_SPEED_LIMIT));
+
+    uint from_speed_limit = get_uint_from_feature(f, FR_SPEED_LIMIT);
+    uint to_speed_limit = get_uint_from_feature(f, TO_SPEED_LIMIT);
+
+    if (from_speed_limit >= 1000 || to_speed_limit >= 1000)
+        throw(format_error(
+                "from_speed_limit='" + std::string(from_speed_limit_s) + "' or to_speed_limit='"
+                        + std::string(to_speed_limit_s) + "' is not valid (>= 1000)"));
+
+    // 998 is a ramp without speed limit information
+    if (from_speed_limit == 998 || to_speed_limit == 998) return;
+
+    // 999 means no speed limit at all
+    const char* from = from_speed_limit == 999 ? "none" : from_speed_limit_s;
+    const char* to = from_speed_limit == 999 ? "none" : to_speed_limit_s;
+
+    if (from_speed_limit != 0 && to_speed_limit != 0) {
+        builder->add_tag("maxspeed:forward", from);
+        builder->add_tag("maxspeed:backward", to);
+    } else if (from_speed_limit != 0 && to_speed_limit == 0) {
+        builder->add_tag("maxspeed", from);
+    } else if (from_speed_limit == 0 && to_speed_limit != 0) {
+        builder->add_tag("maxspeed", to);
+    }
+
+    if (from_speed_limit > 130 || to_speed_limit > 130) std::cerr << "Warning: Found speed limit > 130" << std::endl;
+}
+
+/**
  * \brief maps navteq tags for access, tunnel, bridge, etc. to osm tags
  * \return link id of processed feature.
  */
@@ -144,6 +182,7 @@ uint64_t parse_street_tags(osmium::builder::TagListBuilder *builder, OGRFeature*
     add_highway_tag(builder, get_field_from_feature(f, FUNC_CLASS));
     add_one_way_tag(builder, get_field_from_feature(f, DIR_TRAVEL));
     add_access_tags(builder, f);
+    add_maxspeed_tags(builder, f);
 
     if (!parse_bool(get_field_from_feature(f, PUB_ACCESS)) || parse_bool(get_field_from_feature(f, PRIVATE)))
         add_tag_access_private(builder);
