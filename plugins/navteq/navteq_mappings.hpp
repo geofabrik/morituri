@@ -53,7 +53,7 @@ const char* AREA_NAME = "AREA_NAME";
 const char* ADMIN_LVL = "ADMIN_LVL";
 
 // RDMS_DBF columns
-const char* LINK_ID = "LINK_ID";
+//const char* LINK_ID = "LINK_ID";
 const char* COND_ID = "COND_ID";
 const char* MAN_LINKID = "MAN_LINKID";
 
