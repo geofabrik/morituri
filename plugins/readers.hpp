@@ -19,10 +19,9 @@
  * */
 
 OGRLayer* read_shape_file(const char* shp_file) {
-    OGRDataSource *input_data_source;
-//	std::cout << "read shapefile: " << shp_file << std::endl;
+    RegisterOGRShape();
 
-    input_data_source = OGRSFDriverRegistrar::Open(shp_file, FALSE);
+    OGRDataSource *input_data_source = OGRSFDriverRegistrar::Open(shp_file, FALSE);
     if (input_data_source == NULL) throw(shp_error(shp_file));
 
     OGRLayer *input_layer = input_data_source->GetLayer(0);
@@ -36,7 +35,6 @@ OGRLayer* read_shape_file(std::string shp_file) {
 }
 
 DBFHandle read_dbf_file(std::string dbf_file) {
-//	std::cout << "reading " << dbf_file << std::endl;
     DBFHandle handle = DBFOpen(dbf_file.c_str(), "rb");
     if (handle == NULL) throw(dbf_error(dbf_file));
     return handle;

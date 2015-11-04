@@ -11,9 +11,11 @@
 namespace {
 
 const std::string STREETS_SHP = "Streets.shp";
+const std::string ADMINBNDY_1_SHP = "Adminbndy1.shp";
 const std::string ADMINBNDY_2_SHP = "Adminbndy2.shp";
 const std::string ADMINBNDY_3_SHP = "Adminbndy3.shp";
 const std::string ADMINBNDY_4_SHP = "Adminbndy4.shp";
+const std::string ADMINBNDY_5_SHP = "Adminbndy5.shp";
 
 const std::string MTD_AREA_DBF = "MtdArea.dbf";
 const std::string RDMS_DBF = "Rdms.dbf";

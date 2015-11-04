@@ -46,9 +46,11 @@ bool navteq_plugin::check_input(const char* input_path, const char* output_file)
     }
 
     if (!shp_file_exists(input_path + STREETS_SHP)) return false;
-    if (!shp_file_exists(input_path + ADMINBNDY_2_SHP)) return false;
-    if (!shp_file_exists(input_path + ADMINBNDY_3_SHP)) return false;
-    if (!shp_file_exists(input_path + ADMINBNDY_4_SHP)) return false;
+    if (!shp_file_exists(input_path + ADMINBNDY_1_SHP)) std::cerr << "administrative boundaries level 1 are missing\n";//return false;
+    if (!shp_file_exists(input_path + ADMINBNDY_2_SHP)) std::cerr << "administrative boundaries level 2 are missing\n";//return false;
+    if (!shp_file_exists(input_path + ADMINBNDY_3_SHP)) std::cerr << "administrative boundaries level 3 are missing\n";//return false;
+    if (!shp_file_exists(input_path + ADMINBNDY_4_SHP)) std::cerr << "administrative boundaries level 4 are missing\n";//return false;
+    if (!shp_file_exists(input_path + ADMINBNDY_5_SHP)) std::cerr << "administrative boundaries level 5 are missing\n";//return false;
 
     if (!dbf_file_exists(input_path + MTD_AREA_DBF)) return false;
     if (!dbf_file_exists(input_path + RDMS_DBF)) return false;
@@ -60,9 +62,6 @@ bool navteq_plugin::check_input(const char* input_path, const char* output_file)
 }
 
 void navteq_plugin::execute() {
-    RegisterOGRShape();
-
-//    base_dir = input_path;
 
     add_street_shape_to_osmium(read_shape_file(input_path + STREETS_SHP), input_path);
     assert__id_uniqueness();
@@ -73,9 +72,16 @@ void navteq_plugin::execute() {
 //    assert__node_locations_uniqueness();
 
 // todo admin-levels only apply to the US => more generic for all countries
-    add_admin_shape_to_osmium(read_shape_file(input_path + ADMINBNDY_2_SHP), input_path);
-    add_admin_shape_to_osmium(read_shape_file(input_path + ADMINBNDY_3_SHP), input_path);
-    add_admin_shape_to_osmium(read_shape_file(input_path + ADMINBNDY_4_SHP), input_path);
+    if (shp_file_exists(input_path + ADMINBNDY_1_SHP))
+        add_admin_shape_to_osmium(read_shape_file(input_path + ADMINBNDY_1_SHP), input_path);
+    if (shp_file_exists(input_path + ADMINBNDY_2_SHP))
+        add_admin_shape_to_osmium(read_shape_file(input_path + ADMINBNDY_2_SHP), input_path);
+    if (shp_file_exists(input_path + ADMINBNDY_3_SHP))
+        add_admin_shape_to_osmium(read_shape_file(input_path + ADMINBNDY_3_SHP), input_path);
+    if (shp_file_exists(input_path + ADMINBNDY_4_SHP))
+        add_admin_shape_to_osmium(read_shape_file(input_path + ADMINBNDY_4_SHP), input_path);
+    if (shp_file_exists(input_path + ADMINBNDY_5_SHP))
+        add_admin_shape_to_osmium(read_shape_file(input_path + ADMINBNDY_5_SHP), input_path);
 
     std::string output = output_path;
     if (!output.empty()) {
