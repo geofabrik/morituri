@@ -151,7 +151,8 @@ void add_maxspeed_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f) 
                         + std::string(to_speed_limit_s) + "' is not valid (>= 1000)"));
 
     // 998 is a ramp without speed limit information
-    if (from_speed_limit == 998 || to_speed_limit == 998) return;
+    if (from_speed_limit == 998 || to_speed_limit == 998)
+        return;
 
     // 999 means no speed limit at all
     const char* from = from_speed_limit == 999 ? "none" : from_speed_limit_s;
@@ -226,7 +227,6 @@ void parse_lang_code_file() {
             }
             std::string iso_639_2 = lv.at(0);
             std::string iso_639_1 = lv.at(2);
-            std::cout << "inserting "<< iso_639_2 << "-->" << iso_639_1 << std::endl;;
             if (!iso_639_1.empty()) g_lang_code_map.insert(std::make_pair(iso_639_2, iso_639_1));
         }
         file.close();

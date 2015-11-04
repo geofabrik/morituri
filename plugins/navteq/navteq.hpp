@@ -844,19 +844,19 @@ void process_turn_restrictions(DBFHandle rdms_handle, DBFHandle cdms_handle) {
  * adds layers to osmium:
  *      cur_layer and cur_feature have to be set
  ****************************************************/
-
-void add_point_layer_to_osmium(OGRLayer *layer, std::string dir = std::string()) {
-    cur_layer = layer;
-    while ((cur_feat = layer->GetNextFeature()) != NULL) {
-        OGRPoint *p = static_cast<OGRPoint*>(cur_feat->GetGeometryRef());
-
-        osmium::builder::NodeBuilder builder(m_buffer);
-        build_node(osmium::Location(p->getX(), p->getY()), &builder);
-        build_tag_list(&builder);
-        delete cur_feat;
-    }
-    m_buffer.commit();
-}
+// unused code
+//void add_point_layer_to_osmium(OGRLayer *layer, std::string dir = std::string()) {
+//    cur_layer = layer;
+//    while ((cur_feat = layer->GetNextFeature()) != NULL) {
+//        OGRPoint *p = static_cast<OGRPoint*>(cur_feat->GetGeometryRef());
+//
+//        osmium::builder::NodeBuilder builder(m_buffer);
+//        build_node(osmium::Location(p->getX(), p->getY()), &builder);
+//        build_tag_list(&builder);
+//        delete cur_feat;
+//    }
+//    m_buffer.commit();
+//}
 
 /**
  * \brief adds streets to m_buffer / osmium.
