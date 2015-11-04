@@ -242,7 +242,7 @@ std::string parse_lang_code(std::string lang_code){
 }
 
 std::string navteq_2_osm_admin_lvl(std::string navteq_admin_lvl) {
-    if (string_is_not_integer(navteq_admin_lvl)) throw std::runtime_error("admin level contains invalid character");
+    if (string_is_not_unsigned_integer(navteq_admin_lvl)) throw std::runtime_error("admin level contains invalid character");
 
     int navteq_admin_lvl_int = stoi(navteq_admin_lvl);
 

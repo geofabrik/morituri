@@ -10,6 +10,10 @@
 
 #include <gdal/ogr_api.h>
 #include <gdal/ogrsf_frmts.h>
+#include <shapefil.h>
+#include <osmium/osm/types.hpp>
+
+#include "../plugins/comm2osm_exceptions.hpp"
 #include "readers.hpp"
 
 /**
@@ -25,21 +29,22 @@
  * \return Returns true if existing and valid
  * */
 
-bool shp_file_exists(const char* shp_file) {
+bool shp_file_exists(const char* shp_file, std::ostream& out = std::cerr) {
 
     RegisterOGRShape();
     OGRDataSource *shapedriver = OGRSFDriverRegistrar::Open(shp_file, FALSE);
-    OGRCleanupAll();
     if (shapedriver == NULL) {
-//		std::cerr << "Open of " << shp_file << " failed" << std::endl;
+        out << "Open of SHP file " << shp_file << " failed" << std::endl;
+        OGRCleanupAll();
         return false;
     }
+    OGRCleanupAll();
     delete shapedriver;
     return true;
 }
 
-bool shp_file_exists(std::string shp_file) {
-    return shp_file_exists(shp_file.c_str());
+bool shp_file_exists(std::string shp_file, std::ostream& out = std::cerr) {
+    return shp_file_exists(shp_file.c_str(), out);
 }
 
 /**
@@ -53,7 +58,7 @@ bool shp_file_exists(std::string shp_file) {
 bool dbf_file_exists(const char* dbf_file) {
     DBFHandle handle = DBFOpen(dbf_file, "rb");
     if (handle == NULL) {
-        std::cerr << "Open of " << dbf_file << " failed" << std::endl;
+        std::cerr << "Open of DBF file" << dbf_file << " failed" << std::endl;
         return false;
     }
     DBFClose(handle);
@@ -125,14 +130,15 @@ bool is_in_range(Type test, Type from, Type to) {
     return true;
 }
 
-bool string_is_integer(std::string s) {
+bool string_is_unsigned_integer(std::string s) {
+    if (s.empty()) return false;
     for (auto i : s)
         if (!isdigit(i)) return false;
     return true;
 }
 
-bool string_is_not_integer(std::string s) {
-    return !string_is_integer(s);
+bool string_is_not_unsigned_integer(std::string s) {
+    return !string_is_unsigned_integer(s);
 }
 
 /* unused */
