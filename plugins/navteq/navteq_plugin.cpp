@@ -87,7 +87,7 @@ void navteq_plugin::execute() {
         hdr.set("xml_josm_upload", "false");
 
         osmium::io::Writer writer(outfile, hdr, osmium::io::overwrite::allow);
-        writer(std::move(m_buffer));
+        writer(std::move(g_buffer));
         writer.close();
     }
 
