@@ -2,6 +2,8 @@
 comm2osm
 comm2osm-debug
 tests/*_test
+Testing
+.ycm_extra_conf.pyc
 
 # Created by https://www.gitignore.io
 ### Eclipse ###
