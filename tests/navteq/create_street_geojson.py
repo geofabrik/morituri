@@ -29,6 +29,7 @@ if __name__ == '__main__':
         "LINK_ID":"2147483647",
         "ST_NAME":"AN DER REUTHE",
         "FUNC_CLASS":"1",
+        "SPEED_CAT":"1",
         "FR_SPD_LIM":"100",
         "TO_SPD_LIM":"100",
         "DIR_TRAVEL":"T",

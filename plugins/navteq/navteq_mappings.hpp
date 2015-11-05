@@ -28,6 +28,7 @@ const std::string ZLEVELS_DBF = "Zlevels.dbf";
 const char* LINK_ID = "LINK_ID";
 const char* ST_NAME = "ST_NAME";
 const char* FUNC_CLASS = "FUNC_CLASS";
+const char* SPEED_CAT = "SPEED_CAT";
 const char* FR_SPEED_LIMIT = "FR_SPD_LIM";
 const char* TO_SPEED_LIMIT = "TO_SPD_LIM";
 const char* DIR_TRAVEL = "DIR_TRAVEL";
@@ -93,6 +94,8 @@ const char* POINT_NUM = "POINT_NUM";
 
 #define NAVTEQ_ADMIN_LVL_MIN 1
 #define NAVTEQ_ADMIN_LVL_MAX 7
+
+static const char* speed_cat_metric[] = {"", ">130", "101-130", "91-100", "71-90", "51-70", "31-50", "11-30", "<11"};
 
 #define OSM_MAX_WAY_NODES 1000
 

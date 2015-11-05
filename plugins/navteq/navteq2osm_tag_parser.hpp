@@ -218,6 +218,10 @@ uint64_t parse_street_tags(osmium::builder::TagListBuilder *builder, OGRFeature*
     add_one_way_tag(builder, get_field_from_feature(f, DIR_TRAVEL));
     add_access_tags(builder, f);
     add_maxspeed_tags(builder, f);
+    auto speed_cat = get_uint_from_feature(f, SPEED_CAT);
+    if(0 < speed_cat && speed_cat < (sizeof(speed_cat_metric)/sizeof(const char*)))
+        builder->add_tag("here:speed_cat", speed_cat_metric[speed_cat]);
+    else throw format_error("SPEED_CAT="+std::to_string(speed_cat)+" is not valid.");
 
     add_additional_restrictions(link_id, cdms_map, cnd_mod_map, builder);
 
