@@ -87,7 +87,7 @@ struct mtd_area_dataset {
     }
 };
 // auxiliary map which maps datasets with tags for administrative boundaries
-std::map<osmium::unsigned_object_id_type, mtd_area_dataset> mtd_area_map;
+std::map<osmium::unsigned_object_id_type, mtd_area_dataset> g_mtd_area_map;
 
 // current layer
 OGRLayer* cur_layer;
@@ -658,8 +658,8 @@ void process_admin_boundaries() {
             if (!strcmp(field_name, "AREA_ID")) {
                 osmium::unsigned_object_id_type area_id = std::stoi(field_value);
 
-                if (mtd_area_map.find(area_id) != mtd_area_map.end()) {
-                    auto d = mtd_area_map.at(area_id);
+                if (g_mtd_area_map.find(area_id) != g_mtd_area_map.end()) {
+                    auto d = g_mtd_area_map.at(area_id);
                     if (!d.admin_lvl.empty()) tl_builder.add_tag("navteq_admin_level", d.admin_lvl);
                     if (!d.admin_lvl.empty()) tl_builder.add_tag("admin_level", navteq_2_osm_admin_lvl(d.admin_lvl).c_str());
                     for (auto it : d.lang_code_2_area_name)
@@ -696,7 +696,7 @@ void process_meta_areas(DBFHandle handle) {
         osmium::unsigned_object_id_type area_id = dbf_get_uint_by_field(handle, i, AREA_ID);
 
         mtd_area_dataset data;
-        if (mtd_area_map.find(area_id) != mtd_area_map.end()) data = mtd_area_map.at(area_id);
+        if (g_mtd_area_map.find(area_id) != g_mtd_area_map.end()) data = g_mtd_area_map.at(area_id);
 
         data.area_id = area_id;
 
@@ -712,7 +712,7 @@ void process_meta_areas(DBFHandle handle) {
         std::string area_name = dbf_get_string_by_field(handle, i, AREA_NAME);
         data.lang_code_2_area_name.push_back(std::make_pair(lang_code, to_camel_case_with_spaces(area_name)));
 
-        mtd_area_map.insert(std::make_pair(area_id, data));
+        g_mtd_area_map.insert(std::make_pair(area_id, data));
 //		data.print();
     }
     DBFClose(handle);
@@ -949,7 +949,7 @@ void clear_all() {
     g_osm_id = 1;
     g_link_id_map.clear();
     g_offset_map.clear();
-    mtd_area_map.clear();
+    g_mtd_area_map.clear();
 }
 
 void assert__id_uniqueness() {

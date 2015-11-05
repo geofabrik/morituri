@@ -20,6 +20,7 @@
 
 OGRLayer* read_shape_file(const char* shp_file) {
     RegisterOGRShape();
+    std::cout << "reading " << shp_file << std::endl;
 
     OGRDataSource *input_data_source = OGRSFDriverRegistrar::Open(shp_file, FALSE);
     if (input_data_source == NULL) throw(shp_error(shp_file));
