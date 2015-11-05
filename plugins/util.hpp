@@ -12,6 +12,7 @@
 #include <gdal/ogrsf_frmts.h>
 #include <shapefil.h>
 #include <osmium/osm/types.hpp>
+#include <sstream>
 
 #include "../plugins/comm2osm_exceptions.hpp"
 #include "readers.hpp"
@@ -139,6 +140,26 @@ bool string_is_unsigned_integer(std::string s) {
 
 bool string_is_not_unsigned_integer(std::string s) {
     return !string_is_unsigned_integer(s);
+}
+
+std::string float_to_string (float number){
+    std::ostringstream buff;
+    buff<<number;
+    return buff.str();
+}
+
+const char* float_to_cstring( float number){
+    return float_to_string(number).c_str();
+}
+
+template <class T>
+float kg_to_t(T kilo){
+    return kilo/1000.0f;
+}
+
+template <class T>
+float cm_to_m(T meter){
+    return meter/100.0f;
 }
 
 /* unused */

@@ -17,6 +17,7 @@
 
 #include "util.hpp"
 #include "navteq_mappings.hpp"
+#include "navteq_types.hpp"
 
 // helper
 bool parse_bool(const char* value) {
@@ -174,11 +175,40 @@ void add_maxspeed_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f) 
     if (from_speed_limit > 130 || to_speed_limit > 130) std::cerr << "Warning: Found speed limit > 130" << std::endl;
 }
 
+void add_additional_restrictions(uint64_t link_id, cdms_map_type* cdms_map, cnd_mod_map_type* cnd_mod_map,
+        osmium::builder::TagListBuilder* builder) {
+    if (!cdms_map || !cnd_mod_map) return;
+    auto range = cdms_map->equal_range(link_id);
+    for (auto it = range.first; it != range.second; ++it) {
+        cond_id_type cond_id = it->second;
+        auto it2 = cnd_mod_map->find(cond_id);
+        if (it2 != cnd_mod_map->end()) {
+            auto mod_group = it2->second;
+            auto mod_type = mod_group.mod_type;
+            auto mod_val = mod_group.mod_val;
+
+            // todo add imperial units if in USA
+            if (mod_type == MT_HEIGHT_RESTRICTION) {
+                builder->add_tag("maxheight", float_to_cstring(cm_to_m(mod_val)));
+            } else if (mod_type == MT_WIDTH_RESTRICTION) {
+                builder->add_tag("maxwidth", float_to_cstring(cm_to_m(mod_val)));
+            } else if (mod_type == MT_LENGTH_RESTRICTION) {
+                builder->add_tag("maxlength", float_to_cstring(cm_to_m(mod_val)));
+            } else if (mod_type == MT_WEIGHT_RESTRICTION) {
+                builder->add_tag("maxweight", float_to_cstring(kg_to_t(mod_val)));
+            } else if (mod_type == MT_WEIGHT_PER_AXLE_RESTRICTION) {
+                builder->add_tag("maxaxleload", float_to_cstring(kg_to_t(mod_val)));
+            }
+        }
+    }
+}
+
 /**
  * \brief maps navteq tags for access, tunnel, bridge, etc. to osm tags
  * \return link id of processed feature.
  */
-uint64_t parse_street_tags(osmium::builder::TagListBuilder *builder, OGRFeature* f){
+uint64_t parse_street_tags(osmium::builder::TagListBuilder *builder, OGRFeature* f, cdms_map_type* cdms_map = nullptr,
+        cnd_mod_map_type* cnd_mod_map = nullptr) {
     const char* link_id_s = get_field_from_feature(f, LINK_ID);
     uint64_t link_id = std::stoul(link_id_s);
     builder->add_tag(LINK_ID, link_id_s); // tag for debug purpose
@@ -188,6 +218,8 @@ uint64_t parse_street_tags(osmium::builder::TagListBuilder *builder, OGRFeature*
     add_one_way_tag(builder, get_field_from_feature(f, DIR_TRAVEL));
     add_access_tags(builder, f);
     add_maxspeed_tags(builder, f);
+
+    add_additional_restrictions(link_id, cdms_map, cnd_mod_map, builder);
 
     if (!parse_bool(get_field_from_feature(f, PUB_ACCESS)) || parse_bool(get_field_from_feature(f, PRIVATE)))
         add_tag_access_private(builder);

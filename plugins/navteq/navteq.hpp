@@ -17,6 +17,7 @@
 #include <iostream>
 #include <sstream>
 #include <stdio.h>
+#include <unordered_map>
 
 #include <gdal/ogrsf_frmts.h>
 #include <geos/geom/Geometry.h>
@@ -33,6 +34,7 @@
 #include "readers.hpp"
 #include "util.hpp"
 #include "navteq_mappings.hpp"
+#include "navteq_types.hpp"
 
 #define DEBUG false
 
@@ -196,7 +198,7 @@ size_t write_turn_restriction(std::vector<osmium::unsigned_object_id_type> *osm_
 uint64_t build_tag_list(osmium::builder::Builder* builder, short z_level = -5) {
     osmium::builder::TagListBuilder tl_builder(g_buffer, builder);
 
-    uint64_t link_id = parse_street_tags(&tl_builder, cur_feat);
+    uint64_t link_id = parse_street_tags(&tl_builder, cur_feat, &g_cdms_map, &g_cnd_mod_map);
 
     if (z_level != -5) tl_builder.add_tag("layer", std::to_string(z_level).c_str());
     if (link_id == 0) throw(format_error("layers column field '" + std::string(LINK_ID) + "' is missing"));
@@ -870,6 +872,28 @@ void add_street_shape_to_osmium(OGRLayer *layer, std::string dir = std::string()
 
 // Maps link_ids to pairs of indices and z-levels of waypoints with z-levels not equal 0.
     z_lvl_map z_level_map = process_z_levels(read_dbf_file(dir + sub_dir + ZLEVELS_DBF));
+
+    if ( dbf_file_exists(dir + CND_MOD_DBF)){
+        DBFHandle cnd_mod_handle = read_dbf_file(dir + CND_MOD_DBF);
+        for (int i = 0; i < DBFGetRecordCount(cnd_mod_handle); i++) {
+            cond_id_type cond_id = dbf_get_uint_by_field(cnd_mod_handle, i, COND_ID);
+            // std::string lang_code = dbf_get_string_by_field(cnd_mod_handle, i, LANG_CODE);
+            mod_typ_type mod_type = dbf_get_uint_by_field(cnd_mod_handle, i, CM_MOD_TYPE);
+            mod_val_type mod_val = dbf_get_uint_by_field(cnd_mod_handle, i, CM_MOD_VAL);
+            g_cnd_mod_map.insert(std::make_pair(cond_id, mod_group_type(mod_type, mod_val)));
+        }
+        DBFClose(cnd_mod_handle);
+    }
+
+    if (dbf_file_exists(dir + CDMS_DBF)){
+        DBFHandle cdms_handle = read_dbf_file(dir + CDMS_DBF);
+        for (int i = 0; i < DBFGetRecordCount(cdms_handle); i++) {
+            uint64_t link_id = dbf_get_uint_by_field(cdms_handle, i, LINK_ID);
+            uint64_t cond_id = dbf_get_uint_by_field(cdms_handle, i, COND_ID);
+            g_cdms_map.insert(std::make_pair(link_id, cond_id));
+        }
+        DBFClose(cdms_handle);
+    }
 
 // get all nodes which may be a routable crossing
     while ((cur_feat = cur_layer->GetNextFeature()) != NULL){

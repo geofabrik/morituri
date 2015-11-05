@@ -20,6 +20,7 @@ const std::string ADMINBNDY_5_SHP = "Adminbndy5.shp";
 const std::string MTD_AREA_DBF = "MtdArea.dbf";
 const std::string RDMS_DBF = "Rdms.dbf";
 const std::string CDMS_DBF = "Cdms.dbf";
+const std::string CND_MOD_DBF = "CndMod.dbf";
 const std::string ZLEVELS_DBF = "Zlevels.dbf";
 
 
@@ -61,6 +62,25 @@ const char* MAN_LINKID = "MAN_LINKID";
 
 // CDMS_DBF columns
 const char* COND_TYPE = "COND_TYPE";
+const char* COND_VAL1 = "COND_VAL1";
+const char* COND_VAL2 = "COND_VAL2";
+const char* COND_VAL3 = "COND_VAL3";
+const char* COND_VAL4 = "COND_VAL4";
+
+// condition types (CT)
+#define CT_TRANSPORT_ACCESS_RESTRICTION 23
+#define CT_TRANSPORT_RESTRICTED_DRIVING_MANOEUVRE 26
+
+// modifier types (MT)
+#define MT_HEIGHT_RESTRICTION 41
+#define MT_WEIGHT_RESTRICTION 42
+#define MT_WEIGHT_PER_AXLE_RESTRICTION 43
+#define MT_LENGTH_RESTRICTION 44
+#define MT_WIDTH_RESTRICTION 45
+
+// CndMod types (CM)
+const char* CM_MOD_TYPE = "MOD_TYPE";
+const char* CM_MOD_VAL = "MOD_VAL";
 
 #define RESTRICTED_DRIVING_MANOEUVRE 7
 

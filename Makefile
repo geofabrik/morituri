@@ -11,6 +11,7 @@ NAVTEQ_HEADER=plugins/navteq/navteq_plugin.hpp\
 		plugins/navteq/navteq.hpp\
 		plugins/navteq/navteq2osm_tag_parser.hpp\
 		plugins/navteq/navteq_mappings.hpp\
+		plugins/navteq/navteq_types.hpp\
 		plugins/comm2osm_exceptions.hpp\
 		plugins/util.hpp\
 		plugins/readers.hpp
