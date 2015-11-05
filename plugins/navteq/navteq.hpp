@@ -609,6 +609,10 @@ z_lvl_map process_z_levels(DBFHandle handle) {
 void process_admin_boundaries() {
     OGRLinearRing *ring = static_cast<OGRPolygon*>(cur_feat->GetGeometryRef())->getExteriorRing();
 
+    if (ring->getNumPoints() <= 1 ){
+        std::cerr << " skipping ring with too less ring_points = " << ring->getNumPoints() << std::endl;
+        return;
+    } 
     // todo handle interior rings
 
     node_map admin_nodes;
