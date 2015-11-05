@@ -933,6 +933,7 @@ void add_admin_shape_to_osmium(OGRLayer *layer, std::string dir = std::string(),
         process_admin_boundaries();
         delete cur_feat;
     }
+    g_mtd_area_map.clear();
     delete layer;
 }
 
