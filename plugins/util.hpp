@@ -83,7 +83,7 @@ std::string dbf_get_string_by_field(DBFHandle handle, int row, const char *field
     return DBFReadStringAttribute(handle, row, dbf_get_field_index(handle, row, field_name));
 }
 
-uint64_t dbf_get_int_by_field(DBFHandle handle, int row, const char *field_name) {
+uint64_t dbf_get_uint_by_field(DBFHandle handle, int row, const char *field_name) {
     return DBFReadIntegerAttribute(handle, row, dbf_get_field_index(handle, row, field_name));
 }
 

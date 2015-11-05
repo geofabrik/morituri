@@ -585,10 +585,10 @@ z_lvl_map process_z_levels(DBFHandle handle) {
     std::vector<std::pair<ushort, z_lvl_type>> v;
 
     for (int i = 0; i < DBFGetRecordCount(handle); i++) {
-        uint64_t link_id = dbf_get_int_by_field(handle, i, LINK_ID);
-        ushort point_num = dbf_get_int_by_field(handle, i, POINT_NUM) - 1;
+        uint64_t link_id = dbf_get_uint_by_field(handle, i, LINK_ID);
+        ushort point_num = dbf_get_uint_by_field(handle, i, POINT_NUM) - 1;
         assert(point_num >= 0);
-        short z_level = dbf_get_int_by_field(handle, i, Z_LEVEL);
+        short z_level = dbf_get_uint_by_field(handle, i, Z_LEVEL);
 
         if (i > 0 && last_link_id != link_id && v.size() > 0) {
             z_level_map.insert(std::make_pair(last_link_id, v));
@@ -691,14 +691,14 @@ void process_meta_areas(DBFHandle handle) {
     uint64_t last_link_id;
     for (int i = 0; i < DBFGetRecordCount(handle); i++) {
 
-        osmium::unsigned_object_id_type area_id = dbf_get_int_by_field(handle, i, AREA_ID);
+        osmium::unsigned_object_id_type area_id = dbf_get_uint_by_field(handle, i, AREA_ID);
 
         mtd_area_dataset data;
         if (mtd_area_map.find(area_id) != mtd_area_map.end()) data = mtd_area_map.at(area_id);
 
         data.area_id = area_id;
 
-        std::string admin_lvl = std::to_string(dbf_get_int_by_field(handle, i, ADMIN_LVL));
+        std::string admin_lvl = std::to_string(dbf_get_uint_by_field(handle, i, ADMIN_LVL));
 
         if (data.admin_lvl.empty())
             data.admin_lvl = admin_lvl;
@@ -725,12 +725,12 @@ std::vector<uint64_t> collect_via_manoeuvre_link_ids(uint64_t link_id, DBFHandle
             i += j - 1;
             break;
         }
-        osmium::unsigned_object_id_type next_cond_id = dbf_get_int_by_field(rdms_handle, i + j, COND_ID);
+        osmium::unsigned_object_id_type next_cond_id = dbf_get_uint_by_field(rdms_handle, i + j, COND_ID);
         if (cond_id != next_cond_id) {
             i += j - 1;
             break;
         }
-        via_manoeuvre_link_id.push_back(dbf_get_int_by_field(rdms_handle, i + j, MAN_LINKID));
+        via_manoeuvre_link_id.push_back(dbf_get_uint_by_field(rdms_handle, i + j, MAN_LINKID));
     }
     return via_manoeuvre_link_id;
 }
@@ -807,15 +807,15 @@ void process_turn_restrictions(DBFHandle rdms_handle, DBFHandle cdms_handle) {
     // maps COND_ID to COND_TYPE
     std::map<osmium::unsigned_object_id_type, ushort> cdms_map;
     for (int i = 0; i < DBFGetRecordCount(cdms_handle); i++) {
-        osmium::unsigned_object_id_type cond_id = dbf_get_int_by_field(cdms_handle, i, COND_ID);
-        ushort cond_type = dbf_get_int_by_field(cdms_handle, i, COND_TYPE);
+        osmium::unsigned_object_id_type cond_id = dbf_get_uint_by_field(cdms_handle, i, COND_ID);
+        ushort cond_type = dbf_get_uint_by_field(cdms_handle, i, COND_TYPE);
         cdms_map.insert(std::make_pair(cond_id, cond_type));
     }
 
     for (int i = 0; i < DBFGetRecordCount(rdms_handle); i++) {
 
-        uint64_t link_id = dbf_get_int_by_field(rdms_handle, i, LINK_ID);
-        osmium::unsigned_object_id_type cond_id = dbf_get_int_by_field(rdms_handle, i, COND_ID);
+        uint64_t link_id = dbf_get_uint_by_field(rdms_handle, i, LINK_ID);
+        osmium::unsigned_object_id_type cond_id = dbf_get_uint_by_field(rdms_handle, i, COND_ID);
 
         auto it = cdms_map.find(cond_id);
         if (it != cdms_map.end() && it->second != RESTRICTED_DRIVING_MANOEUVRE) continue;
