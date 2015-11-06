@@ -45,7 +45,14 @@
 #define TIMESTAMP 1
 
 // maps location to node ids
-typedef std::map<osmium::Location, osmium::unsigned_object_id_type> node_map;
+typedef std::map<osmium::Location, osmium::unsigned_object_id_type> node_map_type;
+
+typedef std::pair<osmium::Location, osmium::unsigned_object_id_type> loc_osmid_pair_type;
+
+// maps location to node ids
+typedef std::vector<loc_osmid_pair_type> node_vector_type;
+
+typedef std::vector<osmium::unsigned_object_id_type> osm_id_vector_type;
 
 // type of z-levels (range -4 to +5)
 typedef short z_lvl_type;
@@ -56,7 +63,7 @@ typedef std::map<uint64_t, std::vector<std::pair<ushort, z_lvl_type>>>z_lvl_map;
 static constexpr int buffer_size = 10 * 1000 * 1000;
 
 // maps location of way end nodes to node ids
-node_map g_way_end_points_map;
+node_map_type g_way_end_points_map;
 
 typedef std::pair<osmium::Location, z_lvl_type> node_id_type;
 
@@ -248,7 +255,7 @@ osmium::unsigned_object_id_type get_node(osmium::Location location) {
  * \param node_ref_map holds Node ids suitable to given Location.
  */
 void add_way_node(const osmium::Location& location, osmium::builder::WayNodeListBuilder& wnl_builder,
-        node_map* node_ref_map) {
+        node_map_type* node_ref_map) {
     assert(node_ref_map);
     wnl_builder.add_node_ref(osmium::NodeRef(node_ref_map->at(location), location));
 }
@@ -267,7 +274,7 @@ void test__z_lvl_range(short z_lvl) {
  * \param z_lvl z-level of way. initially invalid (-5).
  * \return id of created Way.
  */
-osmium::unsigned_object_id_type build_way(OGRLineString* ogr_ls, node_map *node_ref_map = nullptr,
+osmium::unsigned_object_id_type build_way(OGRLineString* ogr_ls, node_map_type *node_ref_map = nullptr,
         bool is_sub_linestring = false, short z_lvl = -5) {
     if (is_sub_linestring) test__z_lvl_range(z_lvl);
 
@@ -352,7 +359,7 @@ bool is_superior_or_equal(short superior, short than) {
  * \param node_ref_map provides osm_ids of Nodes to a given location.
  * \param z_lvl
  */
-void build_sub_way_by_index(ushort start_index, ushort end_index, OGRLineString* ogr_ls, node_map* node_ref_map,
+void build_sub_way_by_index(ushort start_index, ushort end_index, OGRLineString* ogr_ls, node_map_type* node_ref_map,
         short z_lvl = 0) {
     OGRLineString ogr_sub_ls = create_sublinestring_geometry(ogr_ls, start_index, end_index);
     osmium::unsigned_object_id_type way_id = build_way(&ogr_sub_ls, node_ref_map, true, z_lvl);
@@ -371,7 +378,7 @@ void build_sub_way_by_index(ushort start_index, ushort end_index, OGRLineString*
  * \return start_index
  */
 ushort create_continuing_sub_ways(ushort first_index, ushort start_index, ushort last_index, uint link_id,
-        std::vector<std::pair<ushort, short> >* node_z_level_vector, OGRLineString* ogr_ls, node_map* node_ref_map) {
+        std::vector<std::pair<ushort, short> >* node_z_level_vector, OGRLineString* ogr_ls, node_map_type* node_ref_map) {
     for (auto it = node_z_level_vector->cbegin(); it != node_z_level_vector->cend(); ++it) {
         short z_lvl = it->second;
         test__z_lvl_range(z_lvl);
@@ -444,7 +451,7 @@ ushort create_continuing_sub_ways(ushort first_index, ushort start_index, ushort
  * \param link_id link_id of processed feature - for debug only.
  */
 void split_way_by_z_level(OGRLineString* ogr_ls, std::vector<std::pair<ushort, short>> *node_z_level_vector,
-        node_map *node_ref_map, uint link_id) {
+        node_map_type *node_ref_map, uint link_id) {
 
     ushort first_index = 0, last_index = ogr_ls->getNumPoints() - 1;
     ushort start_index = node_z_level_vector->cbegin()->first;
@@ -604,34 +611,31 @@ z_lvl_map process_z_levels(DBFHandle handle) {
 }
 
 /**
- * \brief adds administrative boundaries as Relations to m_buffer
+ * \brief creates nodes for administrative boundary
+ * \return osm_ids of created nodes
  */
-void process_admin_boundaries() {
-    std::cout << "type = " << cur_feat->GetGeometryRef()->getGeometryType() << std::endl;
-
-    if (cur_feat->GetGeometryRef()->getGeometryType() != wkbPolygon)
-        return;
-
-    OGRLinearRing *ring = static_cast<OGRPolygon*>(cur_feat->GetGeometryRef())->getExteriorRing();
-
-    assert(ring->getNumPoints() > 1 );
-
-    // todo handle interior rings
-
-    node_map admin_nodes;
-
-    // create nodes for admin boundaries
-    std::vector<std::pair<osmium::Location, osmium::unsigned_object_id_type>> osm_way_node_ids;
-    for (int i = 0; i < ring->getNumPoints()-1; i++) {
+node_vector_type create_admin_boundary_way_nodes(OGRLinearRing* ring) {
+    node_vector_type osm_way_node_ids;
+    node_map_type admin_nodes;
+    for (int i = 0; i < ring->getNumPoints() - 1; i++) {
         osmium::Location location(ring->getX(i), ring->getY(i));
         auto osm_id = build_node(location);
-        osm_way_node_ids.push_back(std::make_pair(location, osm_id));
+        osm_way_node_ids.push_back(loc_osmid_pair_type(location, osm_id));
         admin_nodes.insert(std::make_pair(location, osm_id));
     }
-    osmium::Location location(ring->getX(ring->getNumPoints()-1), ring->getY(ring->getNumPoints()-1));
-    osm_way_node_ids.push_back(std::make_pair(location, admin_nodes.at(location)));
+    osmium::Location location(ring->getX(ring->getNumPoints() - 1), ring->getY(ring->getNumPoints() - 1));
+    osm_way_node_ids.push_back(loc_osmid_pair_type(location, admin_nodes.at(location)));
+    return osm_way_node_ids;
+}
 
-    std::vector < osmium::unsigned_object_id_type > osm_way_ids;
+/**
+ * \brief creates ways for administrative boundary
+ * \return osm_ids of created ways
+ */
+osm_id_vector_type create_admin_boundary_ways(OGRLinearRing* ring) {
+    node_vector_type osm_way_node_ids = create_admin_boundary_way_nodes(ring);
+
+    osm_id_vector_type osm_way_ids;
     int i = 0;
     do {
         osmium::builder::WayBuilder builder(g_buffer);
@@ -644,48 +648,101 @@ void process_admin_boundaries() {
         osm_way_ids.push_back(STATIC_WAY(builder.object()).id());
         i += OSM_MAX_WAY_NODES - 1;
     } while (i < osm_way_node_ids.size());
+    return osm_way_ids;
+}
 
+/**
+ * \brief adds navteq administrative boundary tags to Relation
+ */
+void create_admin_boundary_taglist(osmium::builder::RelationBuilder& builder) {
+    // Mind tl_builder scope!
+    osmium::builder::TagListBuilder tl_builder(g_buffer, &builder);
+    tl_builder.add_tag("type", "multipolygon");
+    tl_builder.add_tag("boundary", "administrative");
+    for (int i = 0; i < cur_layer->GetLayerDefn()->GetFieldCount(); i++) {
+        OGRFieldDefn* po_field_defn = cur_layer->GetLayerDefn()->GetFieldDefn(i);
+        const char* field_name = po_field_defn->GetNameRef();
+        const char* field_value = cur_feat->GetFieldAsString(i);
+        // admin boundary mapping: see NAVSTREETS Street Data Reference Manual: p.947)
+        if (!strcmp(field_name, "AREA_ID")) {
+            osmium::unsigned_object_id_type area_id = std::stoi(field_value);
+            if (g_mtd_area_map.find(area_id) != g_mtd_area_map.end()) {
+                auto d = g_mtd_area_map.at(area_id);
+                if (!d.admin_lvl.empty()) tl_builder.add_tag("navteq_admin_level", d.admin_lvl);
+
+                if (!d.admin_lvl.empty())
+                    tl_builder.add_tag("admin_level", navteq_2_osm_admin_lvl(d.admin_lvl).c_str());
+
+                for (auto it : d.lang_code_2_area_name)
+                    tl_builder.add_tag(std::string("name:" + parse_lang_code(it.first)), it.second);
+                //                    if (!d.area_name_tr.empty()) tl_builder.add_tag("int_name", d.area_name_tr);
+            } else {
+                std::cerr << "skipping unknown navteq_admin_level" << std::endl;
+            }
+        }
+    }
+}
+
+void create_relation_members(const osm_id_vector_type& relation_member_osm_ids,
+        osmium::builder::RelationBuilder& builder, osmium::item_type osm_type, const char* role) {
+    osmium::builder::RelationMemberListBuilder rml_builder(g_buffer, &builder);
+    for (osmium::unsigned_object_id_type osm_id : relation_member_osm_ids)
+        rml_builder.add_member(osm_type, osm_id, role);
+}
+
+osmium::unsigned_object_id_type create_admin_boundary_relation_with_tags(osm_id_vector_type osm_way_ids) {
     osmium::builder::RelationBuilder builder(g_buffer);
     STATIC_RELATION(builder.object()).set_id(g_osm_id++);
     set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
     builder.add_user(USER);
+    create_admin_boundary_taglist(builder);
+    create_relation_members(osm_way_ids, builder, osmium::item_type::way, "outer");
+    return STATIC_RELATION(builder.object()).id();
+}
 
-    // adds navteq administrative boundary tags to Relation
-    { // Mind tl_builder scope!
-        osmium::builder::TagListBuilder tl_builder(g_buffer, &builder);
-        tl_builder.add_tag("type", "multipolygon");
-        tl_builder.add_tag("boundary", "administrative");
+/**
+ * \brief handles administrative boundary multipolygons
+ */
+void process_admin_boundary_multipolygon() {
+    osm_id_vector_type relation_member_ids;
 
-        for (int i = 0; i < cur_layer->GetLayerDefn()->GetFieldCount(); i++) {
-            OGRFieldDefn* po_field_defn = cur_layer->GetLayerDefn()->GetFieldDefn(i);
-            const char* field_name = po_field_defn->GetNameRef();
-            const char* field_value = cur_feat->GetFieldAsString(i);
+    OGRMultiPolygon* mp = static_cast<OGRMultiPolygon*>(cur_feat->GetGeometryRef());
+    for (int i = 0; i < mp->getNumGeometries(); i++){
+        OGRLinearRing* ring = static_cast<OGRPolygon*>(mp->getGeometryRef(i))->getExteriorRing();
+        osm_id_vector_type osm_way_ids = create_admin_boundary_ways(ring);
 
-            // admin boundary mapping: see NAVSTREETS Street Data Reference Manual: p.947)
-            if (!strcmp(field_name, "AREA_ID")) {
-                osmium::unsigned_object_id_type area_id = std::stoi(field_value);
+        std::move(osm_way_ids.begin(), osm_way_ids.end(), std::back_inserter(relation_member_ids));
+    }
+    create_admin_boundary_relation_with_tags(relation_member_ids);
+//    osmium::builder::RelationBuilder builder(g_buffer);
+//    STATIC_RELATION(builder.object()).set_id(g_osm_id++);
+//    set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
+//    builder.add_user(USER);
+//    create_admin_boundary_taglist(builder);
+//    create_relation_members(relation_member_ids, builder, osmium::item_type::way, "outer" );
+}
 
-                if (g_mtd_area_map.find(area_id) != g_mtd_area_map.end()) {
-                    auto d = g_mtd_area_map.at(area_id);
-                    if (!d.admin_lvl.empty()) tl_builder.add_tag("navteq_admin_level", d.admin_lvl);
-                    if (!d.admin_lvl.empty()) tl_builder.add_tag("admin_level", navteq_2_osm_admin_lvl(d.admin_lvl).c_str());
-                    for (auto it : d.lang_code_2_area_name)
-                        tl_builder.add_tag(std::string("name:" + parse_lang_code(it.first)), it.second);
+/**
+ * \brief adds administrative boundaries as Relations to m_buffer
+ */
+void process_admin_boundaries() {
 
-//                    if (!d.area_name_tr.empty()) tl_builder.add_tag("int_name", d.area_name_tr);
 
-                } else {
-                    std::cerr << "skipping unknown navteq_admin_level" << std::endl;
-                }
-            }
-        }
+    switch (cur_feat->GetGeometryRef()->getGeometryType()) {
+        case wkbMultiPolygon:
+            process_admin_boundary_multipolygon();
+            break;
+        case wkbPolygon:
+            create_admin_boundary_relation_with_tags(create_admin_boundary_ways(static_cast<OGRPolygon*>(cur_feat->GetGeometryRef())->getExteriorRing()));
+            break;
+        default:
+            throw(std::runtime_error(
+                    "Adminboundaries with geometry=" + std::string(cur_feat->GetGeometryRef()->getGeometryName())
+                            + " are not yet supported."));
+            break;
     }
 
-    osmium::builder::RelationMemberListBuilder rml_builder(g_buffer, &builder);
-    for (osmium::unsigned_object_id_type way_id : osm_way_ids)
-        rml_builder.add_member(osmium::item_type::way, way_id, "outer");
     g_buffer.commit();
-
 }
 
 /**

@@ -126,13 +126,6 @@ std::string to_camel_case_with_spaces(const char* camel) {
 }
 
 /**
- * \brief adds tag "access: private"
- */
-void add_tag_access_private(osmium::builder::TagListBuilder* builder) {
-    builder->add_tag("access", "private");
-}
-
-/**
  * \brief adds maxspeed tag
  */
 void add_maxspeed_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f) {
@@ -226,7 +219,7 @@ uint64_t parse_street_tags(osmium::builder::TagListBuilder *builder, OGRFeature*
     add_additional_restrictions(link_id, cdms_map, cnd_mod_map, builder);
 
     if (!parse_bool(get_field_from_feature(f, PUB_ACCESS)) || parse_bool(get_field_from_feature(f, PRIVATE)))
-        add_tag_access_private(builder);
+        builder->add_tag("access", "private");
 
     if (parse_bool(get_field_from_feature(f, PAVED))) builder->add_tag("surface", "paved");
     if (parse_bool(get_field_from_feature(f, BRIDGE))) builder->add_tag("bridge", YES);
