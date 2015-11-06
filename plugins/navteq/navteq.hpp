@@ -607,12 +607,15 @@ z_lvl_map process_z_levels(DBFHandle handle) {
  * \brief adds administrative boundaries as Relations to m_buffer
  */
 void process_admin_boundaries() {
+    std::cout << "type = " << cur_feat->GetGeometryRef()->getGeometryType() << std::endl;
+
+    if (cur_feat->GetGeometryRef()->getGeometryType() != wkbPolygon)
+        return;
+
     OGRLinearRing *ring = static_cast<OGRPolygon*>(cur_feat->GetGeometryRef())->getExteriorRing();
 
-    if (ring->getNumPoints() <= 1 ){
-        std::cerr << " skipping ring with too less ring_points = " << ring->getNumPoints() << std::endl;
-        return;
-    } 
+    assert(ring->getNumPoints() > 1 );
+
     // todo handle interior rings
 
     node_map admin_nodes;
