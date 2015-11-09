@@ -43,7 +43,9 @@ node_map_type g_way_end_points_map;
 z_lvl_nodes_map_type g_z_lvl_nodes_map;
 
 // stores osm objects, grows if needed.
-osmium::memory::Buffer g_buffer(buffer_size);
+osmium::memory::Buffer g_node_buffer(buffer_size);
+osmium::memory::Buffer g_way_buffer(buffer_size);
+osmium::memory::Buffer g_rel_buffer(buffer_size);
 
 // id counter for object creation
 osmium::unsigned_object_id_type g_osm_id = 1;
@@ -52,7 +54,7 @@ osmium::unsigned_object_id_type g_osm_id = 1;
 link_id_map_type g_link_id_map;
 
 // Provides access to elements in m_buffer through offsets
-osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, size_t> g_offset_map;
+osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, size_t> g_way_offset_map;
 
 // data structure to store admin boundary tags
 struct mtd_area_dataset {
@@ -98,11 +100,11 @@ void add_common_node_as_via(std::vector<osmium::unsigned_object_id_type>* osm_id
     osmium::builder::RelationMemberListBuilder& rml_builder) {
     assert(osm_ids->size() == 2);
 
-    const osmium::Way &from_way = g_buffer.get<const osmium::Way>(g_offset_map.get(osm_ids->at(0)));
+    const osmium::Way &from_way = g_way_buffer.get<const osmium::Way>(g_way_offset_map.get(osm_ids->at(0)));
     auto from_way_front = from_way.nodes().front().location();
     auto from_way_back = from_way.nodes().back().location();
 
-    const osmium::Way &to_way = g_buffer.get<const osmium::Way>(g_offset_map.get(osm_ids->at(1)));
+    const osmium::Way &to_way = g_way_buffer.get<const osmium::Way>(g_way_offset_map.get(osm_ids->at(1)));
     auto to_way_front = to_way.nodes().front().location();
     auto to_way_back = to_way.nodes().back().location();
 
@@ -144,13 +146,13 @@ void add_common_node_as_via(std::vector<osmium::unsigned_object_id_type>* osm_id
  */
 size_t write_turn_restriction(std::vector<osmium::unsigned_object_id_type> *osm_ids) {
 
-    osmium::builder::RelationBuilder builder(g_buffer);
+    osmium::builder::RelationBuilder builder(g_rel_buffer);
     STATIC_RELATION(builder.object()).set_id(std::to_string(g_osm_id++).c_str());
     set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
     builder.add_user(USER);
 
     {
-        osmium::builder::RelationMemberListBuilder rml_builder(g_buffer, &builder);
+        osmium::builder::RelationMemberListBuilder rml_builder(g_rel_buffer, &builder);
 
         assert(osm_ids->size() >= 2);
 
@@ -160,12 +162,12 @@ size_t write_turn_restriction(std::vector<osmium::unsigned_object_id_type> *osm_
         if (osm_ids->size() == 2) add_common_node_as_via(osm_ids, rml_builder);
         rml_builder.add_member(osmium::item_type::way, osm_ids->at(osm_ids->size() - 1), "to");
 
-        osmium::builder::TagListBuilder tl_builder(g_buffer, &builder);
+        osmium::builder::TagListBuilder tl_builder(g_rel_buffer, &builder);
         // todo get the correct direction of the turn restriction
         tl_builder.add_tag("restriction", "no_straight_on");
         tl_builder.add_tag("type", "restriction");
     }
-    return g_buffer.commit();
+    return g_rel_buffer.commit();
 }
 
 /**
@@ -175,8 +177,8 @@ size_t write_turn_restriction(std::vector<osmium::unsigned_object_id_type> *osm_
  * \return link id of parsed feature.
  */
 
-uint64_t build_tag_list(osmium::builder::Builder* builder, short z_level = -5) {
-    osmium::builder::TagListBuilder tl_builder(g_buffer, builder);
+uint64_t build_tag_list(osmium::builder::Builder* builder, osmium::memory::Buffer& buf, short z_level = -5) {
+    osmium::builder::TagListBuilder tl_builder(buf, builder);
 
     uint64_t link_id = parse_street_tags(&tl_builder, cur_feat, &g_cdms_map, &g_cnd_mod_map);
 
@@ -206,7 +208,7 @@ osmium::unsigned_object_id_type build_node(osmium::Location location, osmium::bu
  * \return id of created Node.
  * */
 osmium::unsigned_object_id_type build_node(osmium::Location location) {
-    osmium::builder::NodeBuilder builder(g_buffer);
+    osmium::builder::NodeBuilder builder(g_node_buffer);
     return build_node(location, &builder);
 }
 
@@ -251,12 +253,12 @@ osmium::unsigned_object_id_type build_way(OGRLineString* ogr_ls, node_map_type *
         bool is_sub_linestring = false, short z_lvl = -5) {
     if (is_sub_linestring) test__z_lvl_range(z_lvl);
 
-    osmium::builder::WayBuilder builder(g_buffer);
+    osmium::builder::WayBuilder builder(g_way_buffer);
     STATIC_WAY(builder.object()).set_id(g_osm_id++);
     set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
 
     builder.add_user(USER);
-    osmium::builder::WayNodeListBuilder wnl_builder(g_buffer, &builder);
+    osmium::builder::WayNodeListBuilder wnl_builder(g_way_buffer, &builder);
     for (int i = 0; i < ogr_ls->getNumPoints(); i++) {
         osmium::Location location(ogr_ls->getX(i), ogr_ls->getY(i));
         bool is_end_point = i == 0 || i == ogr_ls->getNumPoints() - 1;
@@ -277,7 +279,7 @@ osmium::unsigned_object_id_type build_way(OGRLineString* ogr_ls, node_map_type *
         }
         add_way_node(location, wnl_builder, map_containing_node);
     }
-    uint64_t link_id = build_tag_list(&builder, z_lvl);
+    uint64_t link_id = build_tag_list(&builder, g_way_buffer, z_lvl);
     assert(link_id != 0);
     if (g_link_id_map.find(link_id) == g_link_id_map.end())
         g_link_id_map.insert(std::make_pair(link_id, std::vector<osmium::unsigned_object_id_type>()));
@@ -336,7 +338,7 @@ void build_sub_way_by_index(ushort start_index, ushort end_index, OGRLineString*
         short z_lvl = 0) {
     OGRLineString ogr_sub_ls = create_sublinestring_geometry(ogr_ls, start_index, end_index);
     osmium::unsigned_object_id_type way_id = build_way(&ogr_sub_ls, node_ref_map, true, z_lvl);
-    g_offset_map.set(way_id, g_buffer.commit());
+    g_way_offset_map.set(way_id, g_way_buffer.commit());
 }
 
 /**
@@ -502,7 +504,7 @@ void middle_points_preparation(OGRLineString* ogr_ls,
         osmium::Location location(ogr_ls->getX(i), ogr_ls->getY(i));
         node_ref_map.insert(std::make_pair(location, build_node(location)));
     }
-    g_buffer.commit();
+    g_node_buffer.commit();
 }
 
 /**
@@ -523,7 +525,7 @@ void process_way(OGRLineString *ogr_ls, z_lvl_map *z_level_map) {
     auto it = z_level_map->find(link_id);
     if (it == z_level_map->end()) {
         osmium::unsigned_object_id_type way_id = build_way(ogr_ls, &node_ref_map);
-        g_offset_map.set(way_id, g_buffer.commit());
+        g_way_offset_map.set(way_id, g_way_buffer.commit());
     } else {
         // way with different z_levels
         auto first_point_with_different_z_lvl = it->second.at(0);
@@ -540,7 +542,7 @@ void process_way(OGRLineString *ogr_ls, z_lvl_map *z_level_map) {
         else last_z_lvl = 0;
         process_last_end_point(last_index, last_z_lvl, ogr_ls, z_level_map, node_ref_map);
 
-        g_buffer.commit();
+        g_way_buffer.commit();
 
         split_way_by_z_level(ogr_ls, &it->second, &node_ref_map, link_id);
     }
@@ -611,11 +613,11 @@ osm_id_vector_type create_admin_boundary_ways(OGRLinearRing* ring) {
     osm_id_vector_type osm_way_ids;
     int i = 0;
     do {
-        osmium::builder::WayBuilder builder(g_buffer);
+        osmium::builder::WayBuilder builder(g_way_buffer);
         STATIC_WAY(builder.object()).set_id(g_osm_id++);
         set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
         builder.add_user(USER);
-        osmium::builder::WayNodeListBuilder wnl_builder(g_buffer, &builder);
+        osmium::builder::WayNodeListBuilder wnl_builder(g_way_buffer, &builder);
         for (int j = i; j < std::min(i + OSM_MAX_WAY_NODES, (int) osm_way_node_ids.size()); j++)
             wnl_builder.add_node_ref(osm_way_node_ids.at(j).second, osm_way_node_ids.at(j).first);
         osm_way_ids.push_back(STATIC_WAY(builder.object()).id());
@@ -629,7 +631,7 @@ osm_id_vector_type create_admin_boundary_ways(OGRLinearRing* ring) {
  */
 void create_admin_boundary_taglist(osmium::builder::RelationBuilder& builder) {
     // Mind tl_builder scope!
-    osmium::builder::TagListBuilder tl_builder(g_buffer, &builder);
+    osmium::builder::TagListBuilder tl_builder(g_rel_buffer, &builder);
     tl_builder.add_tag("type", "multipolygon");
     tl_builder.add_tag("boundary", "administrative");
     for (int i = 0; i < cur_layer->GetLayerDefn()->GetFieldCount(); i++) {
@@ -658,13 +660,13 @@ void create_admin_boundary_taglist(osmium::builder::RelationBuilder& builder) {
 
 void create_relation_members(const osm_id_vector_type& relation_member_osm_ids,
         osmium::builder::RelationBuilder& builder, osmium::item_type osm_type, const char* role) {
-    osmium::builder::RelationMemberListBuilder rml_builder(g_buffer, &builder);
+    osmium::builder::RelationMemberListBuilder rml_builder(g_rel_buffer, &builder);
     for (osmium::unsigned_object_id_type osm_id : relation_member_osm_ids)
         rml_builder.add_member(osm_type, osm_id, role);
 }
 
 osmium::unsigned_object_id_type create_admin_boundary_relation_with_tags(osm_id_vector_type osm_way_ids) {
-    osmium::builder::RelationBuilder builder(g_buffer);
+    osmium::builder::RelationBuilder builder(g_rel_buffer);
     STATIC_RELATION(builder.object()).set_id(g_osm_id++);
     set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
     builder.add_user(USER);
@@ -708,7 +710,9 @@ void process_admin_boundaries() {
                             + " are not yet supported."));
     }
 
-    g_buffer.commit();
+    g_node_buffer.commit();
+    g_way_buffer.commit();
+    g_rel_buffer.commit();
 }
 
 /**
@@ -783,10 +787,10 @@ std::vector<osmium::unsigned_object_id_type> collect_via_manoeuvre_osm_ids(
 
         std::vector<long unsigned int> &osm_id_vector = g_link_id_map.at(it);
         auto first_osm_id = osm_id_vector.at(0);
-        const auto &first_way = g_buffer.get<const osmium::Way>(g_offset_map.get(first_osm_id));
+        const auto &first_way = g_way_buffer.get<const osmium::Way>(g_way_offset_map.get(first_osm_id));
         osmium::Location first_way_front = first_way.nodes().front().location();
         auto last_osm_id = osm_id_vector.at(osm_id_vector.size()-1);
-        const auto &last_way = g_buffer.get<const osmium::Way>(g_offset_map.get(last_osm_id));
+        const auto &last_way = g_way_buffer.get<const osmium::Way>(g_way_offset_map.get(last_osm_id));
         osmium::Location last_way_back = last_way.nodes().back().location();
 
         // determine end_points
@@ -933,7 +937,8 @@ void add_street_shape_to_osmium(OGRLayer *layer, std::string dir = std::string()
             process_way_end_nodes(static_cast<OGRLineString*>(cur_feat->GetGeometryRef()));
         delete cur_feat;
     }
-    g_buffer.commit();
+    g_node_buffer.commit();
+    g_way_buffer.commit();
 
     cur_layer->ResetReading();
     while ((cur_feat = cur_layer->GetNextFeature()) != NULL){
@@ -976,34 +981,42 @@ void add_admin_shape_to_osmium(OGRLayer *layer, std::string dir = std::string(),
  */
 
 void clear_all() {
-    int cleared = g_buffer.clear();
+    g_node_buffer.clear();
+    g_way_buffer.clear();
+    g_rel_buffer.clear();
     g_osm_id = 1;
     g_link_id_map.clear();
-    g_offset_map.clear();
+    g_way_offset_map.clear();
     g_mtd_area_map.clear();
+}
+
+void add_buffer_ids(std::vector<osmium::unsigned_object_id_type>& v, osmium::memory::Buffer& buf) {
+    for (auto& it : buf) {
+        osmium::OSMObject* obj = static_cast<osmium::OSMObject*>(&it);
+        v.push_back((osmium::unsigned_object_id_type) (obj->id()));
+    }
 }
 
 void assert__id_uniqueness() {
     std::vector < osmium::unsigned_object_id_type > v;
-    for (auto& it : g_buffer) {
-        osmium::OSMObject* obj = static_cast<osmium::OSMObject*>(&it);
-        v.push_back((osmium::unsigned_object_id_type) obj->id());
-    }
+    add_buffer_ids(v, g_node_buffer);
+    add_buffer_ids(v, g_way_buffer);
+    add_buffer_ids(v, g_rel_buffer);
+
     std::sort(v.begin(), v.end());
     auto ptr = unique(v.begin(), v.end());
     assert(ptr == v.end());
 }
 
-void assert__node_locations_uniqueness() {
-    std::map < osmium::Location, osmium::unsigned_object_id_type > loc_z_lvl_map;
-    for (auto& it : g_buffer) {
+void assert__node_location_uniqueness(node_map_type& loc_z_lvl_map, osmium::memory::Buffer& buffer) {
+    for (auto& it : buffer) {
         osmium::OSMObject* obj = static_cast<osmium::OSMObject*>(&it);
         if (obj->type() == osmium::item_type::node) {
             osmium::Node* node = static_cast<osmium::Node*>(obj);
             osmium::Location l = node->location();
-//			std::cout << node->id() << " - "<< l << std::endl;
-            if (loc_z_lvl_map.find(l) == loc_z_lvl_map.end())
-                loc_z_lvl_map.insert(std::make_pair(node->location(), node->id()));
+            //			std::cout << node->id() << " - "<< l << std::endl;
+            if (loc_z_lvl_map.find(l) == loc_z_lvl_map.end()) loc_z_lvl_map.insert(
+                    std::make_pair(node->location(), node->id()));
             else {
                 // todo read Zlevels.DBF and check if the level differs
                 std::cout << "testing double node:";
@@ -1013,6 +1026,13 @@ void assert__node_locations_uniqueness() {
             }
         }
     }
+}
+
+void assert__node_locations_uniqueness() {
+    node_map_type loc_z_lvl_map;
+    assert__node_location_uniqueness(loc_z_lvl_map, g_node_buffer);
+    assert__node_location_uniqueness(loc_z_lvl_map, g_way_buffer);
+    assert__node_location_uniqueness(loc_z_lvl_map, g_rel_buffer);
 }
 
 #endif /* NAVTEQ_HPP_ */

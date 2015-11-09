@@ -115,7 +115,7 @@ TEST_CASE("split subway", "[split subway]") {
         supposed_z_lvl.append(std::to_string(i) + " ");
 
         int ctr = 0;
-        for (auto& it : g_buffer) {
+        for (auto& it : g_way_buffer) {
             osmium::OSMObject* obj = static_cast<osmium::OSMObject*>(&it);
             if (obj->type() == osmium::item_type::way) {
                 CAPTURE(test.z_lvls);
