@@ -2,17 +2,6 @@
 #define NAVTEQ2OSMTAGPARSE_HPP_
 
 #include <iostream>
-#include <getopt.h>
-
-#include <osmium/io/any_input.hpp>
-#include <osmium/io/any_output.hpp>
-#include <osmium/geom/coordinates.hpp>
-
-#include <stdio.h>
-#include <cstdlib>
-#include <iostream>
-#include <sstream>
-#include <vector>
 #include <fstream>
 
 #include "util.hpp"
@@ -168,6 +157,19 @@ void add_maxspeed_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f) 
     if (from_speed_limit > 130 || to_speed_limit > 130) std::cerr << "Warning: Found speed limit > 130" << std::endl;
 }
 
+/**
+ * \brief adds here:speed_cat tag
+ */
+void add_speed_cat_tag(osmium::builder::TagListBuilder* builder, OGRFeature* f) {
+    auto speed_cat = get_uint_from_feature(f, SPEED_CAT);
+    if (0 < speed_cat && speed_cat < (sizeof(speed_cat_metric) / sizeof(const char*))) builder->add_tag(
+            "here:speed_cat", speed_cat_metric[speed_cat]);
+    else throw format_error("SPEED_CAT=" + std::to_string(speed_cat) + " is not valid.");
+}
+
+/**
+ * \brief adds maxheight, maxwidth, maxlength, maxweight and maxaxleload tags.
+ */
 void add_additional_restrictions(uint64_t link_id, cdms_map_type* cdms_map, cnd_mod_map_type* cnd_mod_map,
         osmium::builder::TagListBuilder* builder) {
     if (!cdms_map || !cnd_mod_map) return;
@@ -211,11 +213,7 @@ uint64_t parse_street_tags(osmium::builder::TagListBuilder *builder, OGRFeature*
     add_one_way_tag(builder, get_field_from_feature(f, DIR_TRAVEL));
     add_access_tags(builder, f);
     add_maxspeed_tags(builder, f);
-    auto speed_cat = get_uint_from_feature(f, SPEED_CAT);
-    if(0 < speed_cat && speed_cat < (sizeof(speed_cat_metric)/sizeof(const char*)))
-        builder->add_tag("here:speed_cat", speed_cat_metric[speed_cat]);
-    else throw format_error("SPEED_CAT="+std::to_string(speed_cat)+" is not valid.");
-
+    add_speed_cat_tag(builder, f);
     add_additional_restrictions(link_id, cdms_map, cnd_mod_map, builder);
 
     if (!parse_bool(get_field_from_feature(f, PUB_ACCESS)) || parse_bool(get_field_from_feature(f, PRIVATE)))

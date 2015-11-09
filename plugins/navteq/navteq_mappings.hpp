@@ -104,6 +104,12 @@ static const char* speed_cat_metric[] = {"", ">130", "101-130", "91-100", "71-90
 #define STATIC_RELATION(x) static_cast<osmium::Relation&>(x)
 #define STATIC_OSMOBJECT(x) static_cast<osmium::OSMObject&>(x)
 
+// default tags for osm nodes ways and relations
+#define USER "import"
+#define VERSION "1"
+#define CHANGESET "1"
+#define USERID "1"
+#define TIMESTAMP 1
 }
 
 #endif /* PLUGINS_NAVTEQ_MAPPINGS_HPP_ */

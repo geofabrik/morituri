@@ -11,9 +11,6 @@
 #define NAVTEQ_HPP_
 
 #include <algorithm>
-#include <cstdlib>
-#include <getopt.h>
-#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <stdio.h>
@@ -38,36 +35,12 @@
 
 #define DEBUG false
 
-#define USER "import"
-#define VERSION "1"
-#define CHANGESET "1"
-#define USERID "1"
-#define TIMESTAMP 1
-
-// maps location to node ids
-typedef std::map<osmium::Location, osmium::unsigned_object_id_type> node_map_type;
-
-typedef std::pair<osmium::Location, osmium::unsigned_object_id_type> loc_osmid_pair_type;
-
-// maps location to node ids
-typedef std::vector<loc_osmid_pair_type> node_vector_type;
-
-typedef std::vector<osmium::unsigned_object_id_type> osm_id_vector_type;
-
-// type of z-levels (range -4 to +5)
-typedef short z_lvl_type;
-
-// maps navteq link_ids to pairs of <index, z_lvl>
-typedef std::map<uint64_t, std::vector<std::pair<ushort, z_lvl_type>>>z_lvl_map;
-
 static constexpr int buffer_size = 10 * 1000 * 1000;
 
 // maps location of way end nodes to node ids
 node_map_type g_way_end_points_map;
 
-typedef std::pair<osmium::Location, z_lvl_type> node_id_type;
-
-std::map<node_id_type, osmium::unsigned_object_id_type> g_z_lvl_nodes_map;
+z_lvl_nodes_map_type g_z_lvl_nodes_map;
 
 // stores osm objects, grows if needed.
 osmium::memory::Buffer g_buffer(buffer_size);
@@ -76,7 +49,7 @@ osmium::memory::Buffer g_buffer(buffer_size);
 osmium::unsigned_object_id_type g_osm_id = 1;
 
 // g_link_id_map maps navteq link_ids to a vector of osm_ids (it will mostly map to a single osm_id)
-std::map<uint64_t, std::vector<osmium::unsigned_object_id_type>> g_link_id_map;
+link_id_map_type g_link_id_map;
 
 // Provides access to elements in m_buffer through offsets
 osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, size_t> g_offset_map;
@@ -714,32 +687,25 @@ void process_admin_boundary_multipolygon() {
         std::move(osm_way_ids.begin(), osm_way_ids.end(), std::back_inserter(relation_member_ids));
     }
     create_admin_boundary_relation_with_tags(relation_member_ids);
-//    osmium::builder::RelationBuilder builder(g_buffer);
-//    STATIC_RELATION(builder.object()).set_id(g_osm_id++);
-//    set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
-//    builder.add_user(USER);
-//    create_admin_boundary_taglist(builder);
-//    create_relation_members(relation_member_ids, builder, osmium::item_type::way, "outer" );
 }
 
 /**
  * \brief adds administrative boundaries as Relations to m_buffer
  */
 void process_admin_boundaries() {
+    auto geom_type = cur_feat->GetGeometryRef()->getGeometryType();
 
-
-    switch (cur_feat->GetGeometryRef()->getGeometryType()) {
-        case wkbMultiPolygon:
-            process_admin_boundary_multipolygon();
-            break;
-        case wkbPolygon:
-            create_admin_boundary_relation_with_tags(create_admin_boundary_ways(static_cast<OGRPolygon*>(cur_feat->GetGeometryRef())->getExteriorRing()));
-            break;
-        default:
+    if (geom_type == wkbMultiPolygon) {
+        process_admin_boundary_multipolygon();
+    } else if (geom_type == wkbPolygon) {
+        OGRPolygon* poly = static_cast<OGRPolygon*>(cur_feat->GetGeometryRef());
+        OGRLinearRing* ring = poly->getExteriorRing();
+        osm_id_vector_type ways = create_admin_boundary_ways(ring);
+        create_admin_boundary_relation_with_tags(ways);
+    } else {
             throw(std::runtime_error(
                     "Adminboundaries with geometry=" + std::string(cur_feat->GetGeometryRef()->getGeometryName())
                             + " are not yet supported."));
-            break;
     }
 
     g_buffer.commit();

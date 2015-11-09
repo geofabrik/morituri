@@ -33,5 +33,33 @@ typedef uint64_t link_id_type;
 typedef std::multimap<link_id_type, cond_id_type> cdms_map_type;
 cdms_map_type g_cdms_map;
 
+// vector of osm_ids
+typedef std::vector<osmium::unsigned_object_id_type> osm_id_vector_type;
+
+// maps location to node ids
+typedef std::map<osmium::Location, osmium::unsigned_object_id_type> node_map_type;
+
+// pair of [Location, osm_id]
+typedef std::pair<osmium::Location, osmium::unsigned_object_id_type> loc_osmid_pair_type;
+// vector of pairs of [Location, osm_id]
+typedef std::vector<loc_osmid_pair_type> node_vector_type;
+
+// maps link ids to a vector of osm_ids
+typedef std::map<uint64_t, osm_id_vector_type> link_id_map_type;
+
+
+/* z-level types */
+// type of z-levels (range -4 to +5)
+typedef short z_lvl_type;
+
+// maps navteq link_ids to pairs of <index, z_lvl>
+typedef std::map<uint64_t, std::vector<std::pair<ushort, z_lvl_type>>>z_lvl_map;
+
+// pair [Location, z_level] identifies nodes precisely
+typedef std::pair<osmium::Location, z_lvl_type> node_id_type;
+// maps pair [Location, z_level] to osm_id.
+typedef std::map<node_id_type, osmium::unsigned_object_id_type> z_lvl_nodes_map_type;
+
+
 
 #endif /* PLUGINS_NAVTEQ_NAVTEQ_TYPES_HPP_ */

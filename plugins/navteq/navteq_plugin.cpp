@@ -5,11 +5,15 @@
  *      Author: philip
  */
 
-#include "navteq_plugin.hpp"
-#include "navteq.hpp"
+#include <osmium/io/any_input.hpp>
+#include <osmium/io/any_output.hpp>
+
 #include <gdal/ogr_api.h>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
+
+#include "navteq_plugin.hpp"
+#include "navteq.hpp"
 #include "../util.hpp"
 
 /*
