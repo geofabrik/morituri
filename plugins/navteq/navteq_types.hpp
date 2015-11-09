@@ -8,6 +8,11 @@
 #ifndef PLUGINS_NAVTEQ_NAVTEQ_TYPES_HPP_
 #define PLUGINS_NAVTEQ_NAVTEQ_TYPES_HPP_
 
+#include <unordered_map>
+#include <osmium/index/map/sparse_mem_array.hpp>
+#include <osmium/osm/location.hpp>
+#include <osmium/osm/types.hpp>
+
 
 typedef uint64_t cond_id_type;
 typedef uint64_t mod_typ_type;
@@ -61,5 +66,6 @@ typedef std::pair<osmium::Location, z_lvl_type> node_id_type;
 typedef std::map<node_id_type, osmium::unsigned_object_id_type> z_lvl_nodes_map_type;
 
 
+typedef osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, size_t> osm_id_to_offset_map;
 
 #endif /* PLUGINS_NAVTEQ_NAVTEQ_TYPES_HPP_ */

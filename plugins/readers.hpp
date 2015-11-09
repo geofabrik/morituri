@@ -10,6 +10,8 @@
 
 #include <gdal/ogrsf_frmts.h>
 
+#include "comm2osm_exceptions.hpp"
+
 /*
  * \brief Checks shapefile existance and validity.
  *

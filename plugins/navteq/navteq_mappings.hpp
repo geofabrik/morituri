@@ -8,6 +8,9 @@
 #ifndef PLUGINS_NAVTEQ_NAME_MAPPING_HPP_
 #define PLUGINS_NAVTEQ_NAME_MAPPING_HPP_
 
+#include <osmium/osm.hpp>
+#include <osmium/osm/object.hpp>
+
 namespace {
 
 const std::string STREETS_SHP = "Streets.shp";

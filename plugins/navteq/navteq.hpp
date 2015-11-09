@@ -10,21 +10,15 @@
 #ifndef NAVTEQ_HPP_
 #define NAVTEQ_HPP_
 
-#include <algorithm>
 #include <iostream>
-#include <sstream>
-#include <stdio.h>
-#include <unordered_map>
 
 #include <gdal/ogrsf_frmts.h>
 #include <geos/geom/Geometry.h>
 
-#include <shapefil.h>
-
+#include <osmium/osm/item_type.hpp>
 #include <osmium/osm/types.hpp>
 #include <osmium/osm/object.hpp>
 #include <osmium/builder/osm_object_builder.hpp>
-#include <osmium/index/map/sparse_mem_array.hpp>
 
 #include "comm2osm_exceptions.hpp"
 #include "navteq2osm_tag_parser.hpp"
@@ -53,8 +47,8 @@ osmium::unsigned_object_id_type g_osm_id = 1;
 // g_link_id_map maps navteq link_ids to a vector of osm_ids (it will mostly map to a single osm_id)
 link_id_map_type g_link_id_map;
 
-// Provides access to elements in m_buffer through offsets
-osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, size_t> g_way_offset_map;
+// Provides access to elements in g_way_buffer through offsets
+osm_id_to_offset_map g_way_offset_map;
 
 // data structure to store admin boundary tags
 struct mtd_area_dataset {
@@ -864,14 +858,7 @@ void process_turn_restrictions(DBFHandle rdms_handle, DBFHandle cdms_handle) {
         // only process complete turn relations
         if (via_manoeuvre_osm_id.empty()) continue;
 
-//			// get corresponding osm_way to link
-//			const Way &way = m_buffer.get<const Way>(offset_map.get(osm_id));
-//			assert(osm_id == way.id());
-//			std::cout <<"osm_id="<< osm_id << std::endl;
-//			std::cout <<"way_id="<< way.id() << std::endl;
-
-// todo find out which direction turn restriction has and apply
-// 		for now: always apply 'no_straight_on'
+        // todo find out which direction turn restriction has and apply. For now: always apply 'no_straight_on'
         write_turn_restriction (&via_manoeuvre_osm_id);
     }
 }
@@ -880,19 +867,6 @@ void process_turn_restrictions(DBFHandle rdms_handle, DBFHandle cdms_handle) {
  * adds layers to osmium:
  *      cur_layer and cur_feature have to be set
  ****************************************************/
-// unused code
-//void add_point_layer_to_osmium(OGRLayer *layer, std::string dir = std::string()) {
-//    cur_layer = layer;
-//    while ((cur_feat = layer->GetNextFeature()) != NULL) {
-//        OGRPoint *p = static_cast<OGRPoint*>(cur_feat->GetGeometryRef());
-//
-//        osmium::builder::NodeBuilder builder(m_buffer);
-//        build_node(osmium::Location(p->getX(), p->getY()), &builder);
-//        build_tag_list(&builder);
-//        delete cur_feat;
-//    }
-//    m_buffer.commit();
-//}
 
 /**
  * \brief adds streets to m_buffer / osmium.
@@ -961,8 +935,6 @@ void add_admin_shape_to_osmium(OGRLayer *layer, std::string dir = std::string(),
     assert(layer->GetGeomType() == wkbPolygon);
 
     process_meta_areas(read_dbf_file(dir + sub_dir + MTD_AREA_DBF));
-
-//    std::cout << "feature count = " << layer->GetFeatureCount() << std::endl;
 
     while ((cur_feat = cur_layer->GetNextFeature()) != NULL) {
         process_admin_boundaries();

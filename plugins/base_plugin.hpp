@@ -8,7 +8,6 @@
 #ifndef BASEPLUGIN_HPP_
 #define BASEPLUGIN_HPP_
 
-#include <string>
 #include <assert.h>
 
 class base_plugin {

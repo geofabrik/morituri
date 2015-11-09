@@ -10,7 +10,6 @@
 
 #include <gdal/ogr_api.h>
 #include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
 
 #include "navteq_plugin.hpp"
 #include "navteq.hpp"
