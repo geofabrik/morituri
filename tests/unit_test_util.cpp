@@ -3,11 +3,10 @@
 
 #include "../plugins/util.hpp"
 
-
 TEST_CASE("Shapefile exists", "[SHP exist]"){
-    CHECK(shp_file_exists("tests/testdata/faroe-islands-latest/roads.shp", std::clog) == true);
-    CHECK(shp_file_exists("tests/testdata/faroe-islands-latest/README", std::clog) == false);
-    CHECK(shp_file_exists("tests/testdata/faroe-islands-latest/???", std::clog) == false);
+    CHECK(shp_file_exists("tests/testdata/faroe-islands-latest/roads.shp") == true);
+    CHECK(shp_file_exists("tests/testdata/faroe-islands-latest/README") == false);
+    CHECK(shp_file_exists("tests/testdata/faroe-islands-latest/???") == false);
 
     CHECK(shp_file_exists(std::string("tests/testdata/faroe-islands-latest/roads.shp")) == true);
     CHECK(shp_file_exists(std::string("tests/testdata/faroe-islands-latest/README")) == false);

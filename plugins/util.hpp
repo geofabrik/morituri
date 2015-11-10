@@ -13,6 +13,8 @@
 #include <shapefil.h>
 #include <osmium/osm/types.hpp>
 #include <sstream>
+#include "boost/iostreams/stream.hpp"
+#include "boost/iostreams/device/null.hpp"
 
 #include "../plugins/comm2osm_exceptions.hpp"
 #include "readers.hpp"
@@ -30,12 +32,11 @@
  * \return Returns true if existing and valid
  * */
 
-bool shp_file_exists(const char* shp_file, std::ostream& out = std::cerr) {
+bool shp_file_exists(const char* shp_file) {
 
     RegisterOGRShape();
     OGRDataSource *shapedriver = OGRSFDriverRegistrar::Open(shp_file, FALSE);
     if (shapedriver == NULL) {
-        out << "Open of SHP file " << shp_file << " failed" << std::endl;
         OGRCleanupAll();
         return false;
     }
@@ -44,8 +45,8 @@ bool shp_file_exists(const char* shp_file, std::ostream& out = std::cerr) {
     return true;
 }
 
-bool shp_file_exists(std::string shp_file, std::ostream& out = std::cerr) {
-    return shp_file_exists(shp_file.c_str(), out);
+bool shp_file_exists(std::string shp_file) {
+    return shp_file_exists(shp_file.c_str());
 }
 
 /**
@@ -59,7 +60,6 @@ bool shp_file_exists(std::string shp_file, std::ostream& out = std::cerr) {
 bool dbf_file_exists(const char* dbf_file) {
     DBFHandle handle = DBFOpen(dbf_file, "rb");
     if (handle == NULL) {
-        std::cerr << "Open of DBF file" << dbf_file << " failed" << std::endl;
         return false;
     }
     DBFClose(handle);
@@ -179,5 +179,7 @@ template<class Type1, class Type2>
 void init_map_at_element(std::map<Type1, Type2> *map, Type1 key, osmium::unsigned_object_id_type id) {
     if (map->find(key) == map->end()) map->insert(std::make_pair(key, id));
 }
+
+boost::iostreams::stream<boost::iostreams::null_sink> cnull((boost::iostreams::null_sink()));
 
 #endif /* UTIL_HPP_ */

@@ -20,9 +20,9 @@
  * \return Pointer to first layer in Shapefile.
  * */
 
-OGRLayer* read_shape_file(const char* shp_file) {
+OGRLayer* read_shape_file(const char* shp_file, std::ostream& out = std::cerr) {
     RegisterOGRShape();
-    std::cout << "reading " << shp_file << std::endl;
+    out << "reading " << shp_file << std::endl;
 
     OGRDataSource *input_data_source = OGRSFDriverRegistrar::Open(shp_file, FALSE);
     if (input_data_source == NULL) throw(shp_error(shp_file));
@@ -33,11 +33,12 @@ OGRLayer* read_shape_file(const char* shp_file) {
     return input_layer;
 }
 
-OGRLayer* read_shape_file(std::string shp_file) {
-    return read_shape_file(shp_file.c_str());
+OGRLayer* read_shape_file(std::string shp_file, std::ostream& out = std::cerr) {
+    return read_shape_file(shp_file.c_str(), out);
 }
 
-DBFHandle read_dbf_file(std::string dbf_file) {
+DBFHandle read_dbf_file(std::string dbf_file, std::ostream& out = std::cerr) {
+    out << "reading " << dbf_file << std::endl;
     DBFHandle handle = DBFOpen(dbf_file.c_str(), "rb");
     if (handle == NULL) throw(dbf_error(dbf_file));
     return handle;

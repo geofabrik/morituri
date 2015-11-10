@@ -891,16 +891,18 @@ void process_turn_restrictions(DBFHandle rdms_handle, DBFHandle cdms_handle) {
  * \param layer Pointer to administrative layer.
  */
 
-void add_street_shape_to_osmium(OGRLayer *layer, std::string dir = std::string(), std::string sub_dir = std::string()) {
+void add_street_shape_to_osmium(OGRLayer *layer, std::string dir = std::string(), std::string sub_dir_for_testing = std::string()) {
     assert(layer->GetGeomType() == wkbLineString);
-
     cur_layer = layer;
 
+    std::ostream& out = sub_dir_for_testing.empty() ? std::cerr : cnull;
+
+
 // Maps link_ids to pairs of indices and z-levels of waypoints with z-levels not equal 0.
-    z_lvl_map z_level_map = process_z_levels(read_dbf_file(dir + sub_dir + ZLEVELS_DBF));
+    z_lvl_map z_level_map = process_z_levels(read_dbf_file(dir + sub_dir_for_testing + ZLEVELS_DBF, out));
 
     if ( dbf_file_exists(dir + CND_MOD_DBF)){
-        DBFHandle cnd_mod_handle = read_dbf_file(dir + CND_MOD_DBF);
+        DBFHandle cnd_mod_handle = read_dbf_file(dir + CND_MOD_DBF, out);
         for (int i = 0; i < DBFGetRecordCount(cnd_mod_handle); i++) {
             cond_id_type cond_id = dbf_get_uint_by_field(cnd_mod_handle, i, COND_ID);
             // std::string lang_code = dbf_get_string_by_field(cnd_mod_handle, i, LANG_CODE);
@@ -912,7 +914,7 @@ void add_street_shape_to_osmium(OGRLayer *layer, std::string dir = std::string()
     }
 
     if (dbf_file_exists(dir + CDMS_DBF)){
-        DBFHandle cdms_handle = read_dbf_file(dir + CDMS_DBF);
+        DBFHandle cdms_handle = read_dbf_file(dir + CDMS_DBF, out);
         for (int i = 0; i < DBFGetRecordCount(cdms_handle); i++) {
             uint64_t link_id = dbf_get_uint_by_field(cdms_handle, i, LINK_ID);
             uint64_t cond_id = dbf_get_uint_by_field(cdms_handle, i, COND_ID);
@@ -948,11 +950,13 @@ void add_street_shape_to_osmium(OGRLayer *layer, std::string dir = std::string()
  * \param layer pointer to administrative layer.
  */
 
-void add_admin_shape_to_osmium(OGRLayer *layer, std::string dir = std::string(), std::string sub_dir = std::string()) {
-    cur_layer = layer;
+void add_admin_shape_to_osmium(OGRLayer *layer, std::string dir = std::string(), std::string sub_dir_for_testing = std::string()) {
     assert(layer->GetGeomType() == wkbPolygon);
+    cur_layer = layer;
 
-    process_meta_areas(read_dbf_file(dir + sub_dir + MTD_AREA_DBF));
+    std::ostream& out = sub_dir_for_testing.empty() ? std::cerr : cnull;
+
+    process_meta_areas(read_dbf_file(dir + sub_dir_for_testing + MTD_AREA_DBF, out));
 
     while ((cur_feat = cur_layer->GetNextFeature()) != NULL) {
         process_admin_boundaries();
