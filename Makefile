@@ -84,4 +84,4 @@ clean:
 	rm -f comm2osm test testfiles
 	rm -rf .tmp_navteq
 	rm -rf doc
-	rm tests/navteq_test
+	rm -f tests/navteq_test

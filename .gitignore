@@ -1,6 +1,7 @@
 .README.md.html
 comm2osm
 comm2osm-debug
+comm2osm-debug.dSYM
 tests/*_test
 Testing
 .ycm_extra_conf.pyc
