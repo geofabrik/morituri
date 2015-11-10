@@ -794,7 +794,7 @@ std::vector<osmium::unsigned_object_id_type> collect_via_manoeuvre_osm_ids(
 
         if (g_link_id_map.find(it) == g_link_id_map.end()) return std::vector<osmium::unsigned_object_id_type>();
 
-        std::vector<long unsigned int> &osm_id_vector = g_link_id_map.at(it);
+        osm_id_vector_type &osm_id_vector = g_link_id_map.at(it);
         auto first_osm_id = osm_id_vector.at(0);
         const auto &first_way = g_way_buffer.get<const osmium::Way>(g_way_offset_map.get(first_osm_id));
         osmium::Location first_way_front = first_way.nodes().front().location();
