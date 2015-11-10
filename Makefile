@@ -27,6 +27,8 @@ HEADER=${BASE_HEADER}\
 		${DUMMY_HEADER}
 
 # test sources and headers
+NAVTEQ_UNIT_TEST_SOURCE=tests/navteq/unit_test_navteq2osm.cpp
+NAVTEQ_UNIT_TEST_HEADER=${NAVTEQ_HEADER}
 NAVTEQ_TEST_SOURCE=tests/navteq/test_navteq2osm.cpp
 NAVTEQ_TEST_HEADER=${NAVTEQ_HEADER}
 UTIL_TEST_SOURCE=tests/unit_test_util.cpp
@@ -49,7 +51,7 @@ LIBS=-lbz2 -lgdal -lexpat -lgeos -lpthread -lz -lprotobuf-lite -lboost_system -l
 CXXFLAGS=-std=c++11 
 DEBUG_FLAGS=-O0 -g
 
-all: comm2osm-debug comm2osm tests/navteq_test tests/util_test
+all: comm2osm-debug comm2osm tests
 .PHONY: all
 
 comm2osm-debug: ${SOURCE} ${HEADER}
@@ -58,6 +60,12 @@ comm2osm-debug: ${SOURCE} ${HEADER}
 comm2osm: ${SOURCE} ${HEADER}
 	g++ ${CXXFLAGS} -o comm2osm ${SOURCE} ${INCLUDES} ${LIBS}
 
+tests: tests/navteq_test tests/util_test tests/navteq_unit_test
+.PHONY: tests
+
+tests/navteq_unit_test: ${NAVTEQ_UNIT_TEST_SOURCE} ${NAVTEQ_UNIT_TEST_HEADER}
+	g++ ${CXXFLAGS} -o tests/navteq_unit_test ${NAVTEQ_UNIT_TEST_SOURCE} ${INCLUDES} ${LIBS}
+
 tests/navteq_test: ${NAVTEQ_TEST_SOURCE} ${NAVTEQ_TEST_HEADER}
 	g++ ${CXXFLAGS} -o tests/navteq_test ${NAVTEQ_TEST_SOURCE} ${INCLUDES} ${LIBS}
 
@@ -65,6 +73,7 @@ tests/util_test: ${UTIL_TEST_SOURCE} ${UTIL_TEST_HEADER}
 	g++ ${CXXFLAGS} -o tests/util_test ${UTIL_TEST_SOURCE} ${INCLUDES} ${LIBS}
 
 test:
+	./tests/navteq_unit_test
 	./tests/navteq_test
 	./tests/util_test
 

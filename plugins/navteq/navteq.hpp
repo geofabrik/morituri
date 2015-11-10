@@ -585,15 +585,18 @@ z_lvl_map process_z_levels(DBFHandle handle) {
  */
 node_vector_type create_admin_boundary_way_nodes(OGRLinearRing* ring) {
     node_vector_type osm_way_node_ids;
-    node_map_type admin_nodes;
+    loc_osmid_pair_type first_node;
     for (int i = 0; i < ring->getNumPoints() - 1; i++) {
         osmium::Location location(ring->getX(i), ring->getY(i));
         auto osm_id = build_node(location);
         osm_way_node_ids.push_back(loc_osmid_pair_type(location, osm_id));
-        admin_nodes.insert(std::make_pair(location, osm_id));
+        if (i == 0) first_node = loc_osmid_pair_type(location, osm_id);
     }
-    osmium::Location location(ring->getX(ring->getNumPoints() - 1), ring->getY(ring->getNumPoints() - 1));
-    osm_way_node_ids.push_back(loc_osmid_pair_type(location, admin_nodes.at(location)));
+    // first and last node are the same in rings, hence add first node_id and skip last node.
+    osmium::Location last_location(ring->getX(ring->getNumPoints() - 1), ring->getY(ring->getNumPoints() - 1));
+    if (last_location != first_node.first)
+        throw format_error("admin boundary ring is invalid. First and last node don't match");
+    osm_way_node_ids.push_back(first_node);
     return osm_way_node_ids;
 }
 
@@ -677,10 +680,9 @@ osmium::unsigned_object_id_type create_admin_boundary_relation_with_tags(osm_id_
 /**
  * \brief handles administrative boundary multipolygons
  */
-void create_admin_boundary_multipolygon() {
+void create_admin_boundary_multipolygon(OGRMultiPolygon* mp) {
     osm_id_vector_type mp_ext_ring_osm_ids, mp_int_ring_osm_ids;
 
-    OGRMultiPolygon* mp = static_cast<OGRMultiPolygon*>(cur_feat->GetGeometryRef());
     for (int i = 0; i < mp->getNumGeometries(); i++){
         OGRPolygon* poly = static_cast<OGRPolygon*>(mp->getGeometryRef(i));
 
@@ -696,8 +698,7 @@ void create_admin_boundary_multipolygon() {
     create_admin_boundary_relation_with_tags(mp_ext_ring_osm_ids, mp_int_ring_osm_ids);
 }
 
-void create_admin_boundary_polygon() {
-    OGRPolygon* poly = static_cast<OGRPolygon*>(cur_feat->GetGeometryRef());
+void create_admin_boundary_polygon(OGRPolygon* poly) {
     osm_id_vector_type exterior_way_ids = create_admin_boundary_ways(poly->getExteriorRing());
     osm_id_vector_type interior_way_ids;
     for (int i = 0; i < poly->getNumInteriorRings(); i++) {
@@ -713,8 +714,10 @@ void create_admin_boundary_polygon() {
 void process_admin_boundaries() {
     auto geom_type = cur_feat->GetGeometryRef()->getGeometryType();
 
-    if (geom_type == wkbMultiPolygon) create_admin_boundary_multipolygon();
-    else if (geom_type == wkbPolygon) create_admin_boundary_polygon();
+    if (geom_type == wkbMultiPolygon) create_admin_boundary_multipolygon(
+            static_cast<OGRMultiPolygon*>(cur_feat->GetGeometryRef()));
+    else if (geom_type == wkbPolygon) create_admin_boundary_polygon(
+            static_cast<OGRPolygon*>(cur_feat->GetGeometryRef()));
     else throw(std::runtime_error(
             "Adminboundaries with geometry=" + std::string(cur_feat->GetGeometryRef()->getGeometryName())
                     + " are not yet supported."));
