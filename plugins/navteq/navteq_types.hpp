@@ -31,12 +31,13 @@ struct mod_group_type{
     }
 };
 
+typedef uint64_t area_id_type;
+typedef uint64_t govt_code_type;
+
 typedef std::unordered_map<cond_id_type, mod_group_type> cnd_mod_map_type;
-cnd_mod_map_type g_cnd_mod_map;
 
 typedef uint64_t link_id_type;
 typedef std::multimap<link_id_type, cond_id_type> cdms_map_type;
-cdms_map_type g_cdms_map;
 
 // vector of osm_ids
 typedef std::vector<osmium::unsigned_object_id_type> osm_id_vector_type;

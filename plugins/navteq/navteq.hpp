@@ -65,6 +65,11 @@ struct mtd_area_dataset {
 // auxiliary map which maps datasets with tags for administrative boundaries
 std::map<osmium::unsigned_object_id_type, mtd_area_dataset> g_mtd_area_map;
 
+// map for conditional modifications
+cnd_mod_map_type g_cnd_mod_map;
+
+// map for conditional driving manoeuvres
+cdms_map_type g_cdms_map;
 // current layer
 OGRLayer* cur_layer;
 
