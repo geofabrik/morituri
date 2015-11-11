@@ -49,6 +49,7 @@ if __name__ == '__main__':
         "TUNNEL":"Y",
         "TOLLWAY":"Y",
         "ROUNDABOUT":"N",
+        "FERRY_TYPE":"H",
         "FOURWHLDR":"N",
         "PHYS_LANES":"1",
         "PUB_ACCESS":"Y"

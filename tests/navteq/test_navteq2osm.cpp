@@ -10,7 +10,7 @@ static std::string tmp_dir = ".tmp_navteq/";
 TEST_CASE("Parse oneway", "[oneway]") {
     CHECK(parse_one_way_tag("F") == "yes");
     CHECK(parse_one_way_tag("T") == "-1");
-    CHECK(parse_one_way_tag("B") == "no");
+    CHECK(parse_one_way_tag("B") == nullptr);
 }
 
 void system_s(std::string s) {

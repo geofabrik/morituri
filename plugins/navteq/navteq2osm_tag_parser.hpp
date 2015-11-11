@@ -46,25 +46,28 @@ const char* parse_one_way_tag(const char* value) {
     else if (!strcmp(value, "T"))			// T --> TO reference node
         return "-1";    // todo reverse way instead using "-1"
     else if (!strcmp(value, "B"))			// B --> BOTH ways are allowed
-        return NO;
+        return nullptr;
     throw(format_error("value '" + std::string(value) + "' for oneway not valid"));
 }
 
 void add_one_way_tag(osmium::builder::TagListBuilder* builder, const char* value) {
     const char* one_way = "oneway";
     const char* parsed_value = parse_one_way_tag(value);
-    builder->add_tag(one_way, parsed_value);
+    if (parsed_value) builder->add_tag(one_way, parsed_value);
 }
 
 void add_access_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f) {
-    builder->add_tag("motorcar", parse_bool(get_field_from_feature(f, AR_AUTO)) ? YES : NO);
-    builder->add_tag("bus", parse_bool(get_field_from_feature(f, AR_BUS)) ? YES : NO);
-    builder->add_tag("taxi", parse_bool(get_field_from_feature(f, AR_TAXIS)) ? YES : NO);
-    builder->add_tag("hov", parse_bool(get_field_from_feature(f, AR_CARPOOL)) ? YES : NO);
-    builder->add_tag("foot", parse_bool(get_field_from_feature(f, AR_PEDESTRIANS)) ? YES : NO);
-    builder->add_tag("emergency", parse_bool(get_field_from_feature(f, AR_EMERVEH)) ? YES : NO);
-    builder->add_tag("motorcycle", parse_bool(get_field_from_feature(f, AR_MOTORCYCLES)) ? YES : NO);
-    if (parse_bool(get_field_from_feature(f, AR_THROUGH_TRAFFIC))) builder->add_tag("access", "destination");
+    if (! parse_bool(get_field_from_feature(f, AR_AUTO))) builder->add_tag("motorcar",  NO);
+    if (! parse_bool(get_field_from_feature(f, AR_BUS))) builder->add_tag("bus",  NO);
+    if (! parse_bool(get_field_from_feature(f, AR_TAXIS))) builder->add_tag("taxi",  NO);
+//    if (! parse_bool(get_field_from_feature(f, AR_CARPOOL))) builder->add_tag("hov",  NO);
+    if (! parse_bool(get_field_from_feature(f, AR_PEDESTRIANS))) builder->add_tag("foot",  NO);
+    if (! parse_bool(get_field_from_feature(f, AR_TRUCKS))) builder->add_tag("hgv", NO);
+    if (! parse_bool(get_field_from_feature(f, AR_EMERVEH))) builder->add_tag("emergency",  NO);
+    if (! parse_bool(get_field_from_feature(f, AR_MOTORCYCLES))) builder->add_tag("motorcycle",  NO);
+    if (! parse_bool(get_field_from_feature(f, AR_THROUGH_TRAFFIC))) builder->add_tag("access", "destination");
+    if (! parse_bool(get_field_from_feature(f, PUB_ACCESS)) || parse_bool(get_field_from_feature(f, PRIVATE)))
+        builder->add_tag("access", "private");
 }
 
 /**
@@ -160,7 +163,7 @@ void add_maxspeed_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f) 
 /**
  * \brief adds here:speed_cat tag
  */
-void add_speed_cat_tag(osmium::builder::TagListBuilder* builder, OGRFeature* f) {
+void add_here_speed_cat_tag(osmium::builder::TagListBuilder* builder, OGRFeature* f) {
     auto speed_cat = get_uint_from_feature(f, SPEED_CAT);
     if (0 < speed_cat && speed_cat < (sizeof(speed_cat_metric) / sizeof(const char*))) builder->add_tag(
             "here:speed_cat", speed_cat_metric[speed_cat]);
@@ -198,6 +201,62 @@ void add_additional_restrictions(uint64_t link_id, cdms_map_type* cdms_map, cnd_
     }
 }
 
+bool is_ferry(const char* value) {
+    if (!strcmp(value, "H")) return false;      // H --> not a ferry
+    else if (!strcmp(value, "B")) return true;  // T --> boat ferry
+    else if (!strcmp(value, "R")) return true;  // B --> rail ferry
+    throw(format_error("value '" + std::string(value) + "' for " + std::string(FERRY) + " not valid"));
+}
+
+bool only_pedestrians(OGRFeature* f) {
+    if (strcmp(get_field_from_feature(f, AR_PEDESTRIANS), "Y")) return false;
+    if (! strcmp(get_field_from_feature(f, AR_AUTO),"Y")) return false;
+    if (! strcmp(get_field_from_feature(f, AR_BUS),"Y")) return false;
+//    if (! strcmp(get_field_from_feature(f, AR_CARPOOL),"Y")) return false;
+    if (! strcmp(get_field_from_feature(f, AR_EMERVEH),"Y")) return false;
+    if (! strcmp(get_field_from_feature(f, AR_MOTORCYCLES),"Y")) return false;
+    if (! strcmp(get_field_from_feature(f, AR_TAXIS),"Y")) return false;
+    if (! strcmp(get_field_from_feature(f, AR_THROUGH_TRAFFIC),"Y")) return false;
+    return true;
+}
+
+void add_ferry_tag(osmium::builder::TagListBuilder* builder, OGRFeature* f) {
+    const char* ferry = get_field_from_feature(f, FERRY);
+    builder->add_tag("route", "ferry");
+    if (!strcmp(ferry, "B")) {
+        if (only_pedestrians(f)) {
+            builder->add_tag("foot", YES);
+        } else {
+            builder->add_tag("foot", parse_bool(get_field_from_feature(f, AR_PEDESTRIANS)) ? YES : NO);
+            builder->add_tag("motorcar", parse_bool(get_field_from_feature(f, AR_AUTO)) ? YES : NO);
+        }
+
+    } else if (!strcmp(ferry, "R")) {
+        builder->add_tag("railway", "ferry");
+    } else throw(format_error("value '" + std::string(ferry) + "' for " + std::string(FERRY) + " not valid"));
+}
+
+void add_lanes_tag(osmium::builder::TagListBuilder* builder, OGRFeature* f) {
+    const char* number_of_physical_lanes = get_field_from_feature(f, PHYS_LANES);
+    if (strcmp(number_of_physical_lanes, "0")) builder->add_tag("lanes", number_of_physical_lanes);
+}
+
+void add_highway_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f, uint64_t link_id,
+        cdms_map_type* cdms_map, cnd_mod_map_type* cnd_mod_map) {
+    add_highway_tag(builder, get_field_from_feature(f, FUNC_CLASS));
+    add_one_way_tag(builder, get_field_from_feature(f, DIR_TRAVEL));
+    add_access_tags(builder, f);
+    add_maxspeed_tags(builder, f);
+    add_lanes_tag(builder, f);
+
+    if (parse_bool(get_field_from_feature(f, PAVED))) builder->add_tag("surface", "paved");
+    if (parse_bool(get_field_from_feature(f, BRIDGE))) builder->add_tag("bridge", YES);
+    if (parse_bool(get_field_from_feature(f, TUNNEL))) builder->add_tag("tunnel", YES);
+    if (parse_bool(get_field_from_feature(f, TOLLWAY))) builder->add_tag("toll", YES);
+    if (parse_bool(get_field_from_feature(f, ROUNDABOUT))) builder->add_tag("junction", "roundabout");
+    if (parse_bool(get_field_from_feature(f, FOURWHLDR))) builder->add_tag("4wd_only", YES);
+}
+
 /**
  * \brief maps navteq tags for access, tunnel, bridge, etc. to osm tags
  * \return link id of processed feature.
@@ -209,25 +268,15 @@ uint64_t parse_street_tags(osmium::builder::TagListBuilder *builder, OGRFeature*
     builder->add_tag(LINK_ID, link_id_s); // tag for debug purpose
 
     builder->add_tag("name", to_camel_case_with_spaces(get_field_from_feature(f, ST_NAME)).c_str());
-    add_highway_tag(builder, get_field_from_feature(f, FUNC_CLASS));
-    add_one_way_tag(builder, get_field_from_feature(f, DIR_TRAVEL));
-    add_access_tags(builder, f);
-    add_maxspeed_tags(builder, f);
-    add_speed_cat_tag(builder, f);
+    if (is_ferry(get_field_from_feature(f, FERRY))) {
+        add_ferry_tag(builder, f);
+    } else {  // usual highways
+        add_highway_tags(builder, f, link_id, cdms_map, cnd_mod_map);
+    }
+
+    // tags which apply to highways and ferry routes
     add_additional_restrictions(link_id, cdms_map, cnd_mod_map, builder);
-
-    if (!parse_bool(get_field_from_feature(f, PUB_ACCESS)) || parse_bool(get_field_from_feature(f, PRIVATE)))
-        builder->add_tag("access", "private");
-
-    if (parse_bool(get_field_from_feature(f, PAVED))) builder->add_tag("surface", "paved");
-    if (parse_bool(get_field_from_feature(f, BRIDGE))) builder->add_tag("bridge", YES);
-    if (parse_bool(get_field_from_feature(f, TUNNEL))) builder->add_tag("tunnel", YES);
-    if (parse_bool(get_field_from_feature(f, TOLLWAY))) builder->add_tag("toll", YES);
-    if (parse_bool(get_field_from_feature(f, ROUNDABOUT))) builder->add_tag("junction", "roundabout");
-    if (parse_bool(get_field_from_feature(f, FOURWHLDR))) builder->add_tag("4wd_only", YES);
-
-    const char* number_of_physical_lanes = get_field_from_feature(f, PHYS_LANES);
-    if( strcmp(number_of_physical_lanes, "0") ) builder->add_tag("lanes", number_of_physical_lanes);
+    add_here_speed_cat_tag(builder, f);
 
     return link_id;
 }
