@@ -20,7 +20,29 @@ typedef uint64_t mod_val_type;
 
 typedef std::pair<mod_typ_type, mod_val_type> mod_pair_type;
 
-struct mod_group_type{
+struct cntry_ref_type {
+    char unit_measure;
+    char speed_limit_unit[3];
+    char iso_code[3];
+    cntry_ref_type(){}
+    cntry_ref_type(char unit_measure, const char* speed_limit_unit, const char* iso_code) {
+        this->unit_measure = unit_measure;
+        strcpy(this->speed_limit_unit, speed_limit_unit);
+        strcpy(this->iso_code, iso_code);
+    }
+    bool operator==(cntry_ref_type rhs){
+        if (this->unit_measure != rhs.unit_measure) return false;
+        if (strcmp(this->speed_limit_unit, rhs.speed_limit_unit)) return false;
+        if (strcmp(this->iso_code, rhs.iso_code)) return false;
+        return true;
+    }
+    bool operator!=(cntry_ref_type rhs){
+        return !(*this == rhs);
+    }
+
+};
+
+struct mod_group_type {
     const char* lang_code;
     mod_typ_type mod_type;
     mod_val_type mod_val;
@@ -33,6 +55,8 @@ struct mod_group_type{
 
 typedef uint64_t area_id_type;
 typedef uint64_t govt_code_type;
+typedef std::map<area_id_type, govt_code_type> area_id_govt_code_map_type;
+typedef std::map<govt_code_type, cntry_ref_type> cntry_ref_map_type;
 
 typedef std::unordered_map<cond_id_type, mod_group_type> cnd_mod_map_type;
 

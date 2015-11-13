@@ -20,6 +20,7 @@ const std::string ADMINBNDY_3_SHP = "Adminbndy3.shp";
 const std::string ADMINBNDY_4_SHP = "Adminbndy4.shp";
 const std::string ADMINBNDY_5_SHP = "Adminbndy5.shp";
 
+const std::string MTD_CNTRY_REF_DBF = "MtdCntryRef.dbf";
 const std::string MTD_AREA_DBF = "MtdArea.dbf";
 const std::string RDMS_DBF = "Rdms.dbf";
 const std::string CDMS_DBF = "Cdms.dbf";
@@ -54,12 +55,22 @@ const char* FERRY = "FERRY_TYPE";
 const char* FOURWHLDR = "FOURWHLDR";
 const char* PHYS_LANES = "PHYS_LANES";
 const char* PUB_ACCESS = "PUB_ACCESS";
+const char* L_AREA_ID = "L_AREA_ID";
+const char* R_AREA_ID = "R_AREA_ID";
 
 // MTD_AREA_DBF columns
 const char* AREA_ID = "AREA_ID";
 const char* LANG_CODE = "LANG_CODE";
 const char* AREA_NAME = "AREA_NAME";
 const char* ADMIN_LVL = "ADMIN_LVL";
+const char* GOVT_CODE = "GOVT_CODE";
+
+// MTD_CNTRY_REF columns
+const char* UNTMEASURE = "UNTMEASURE";
+//const char* MAX_ADMINLEVEL = "MAX_ADMINLEVEL";
+const char* SPEEDLIMITUNIT = "SPDLIMUNIT";
+const char* ISO_CODE = "ISO_CODE";
+
 
 // RDMS_DBF columns
 //const char* LINK_ID = "LINK_ID";

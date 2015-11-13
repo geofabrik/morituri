@@ -171,11 +171,38 @@ void add_here_speed_cat_tag(osmium::builder::TagListBuilder* builder, OGRFeature
 }
 
 /**
+ * \brief check if unit is imperial. area_id(Streets.dbf) -> govt_id(MtdArea.dbf) -> unit_measure(MtdCntryRef.dbf)
+ * \param l_area_id area_id on the left side of the link
+ * \param r_area_id area_id on the right side of the link
+ * \param area_govt_map maps area_ids to govt_codes
+ * \param cntry_map maps govt_codes to cntry_ref_types
+ * \return returns false if any of the areas contain metric units
+ */
+bool is_imperial(uint64_t l_area_id, uint64_t r_area_id, area_id_govt_code_map_type* area_govt_map,
+        cntry_ref_map_type* cntry_map) {
+    if (area_govt_map->find(l_area_id) != area_govt_map->end())
+        if (cntry_map->find(area_govt_map->at(l_area_id)) != cntry_map->end())
+            if (cntry_map->at(area_govt_map->at(l_area_id)).unit_measure == 'M') return false;
+
+    if (area_govt_map->find(r_area_id) != area_govt_map->end())
+        if (cntry_map->find(area_govt_map->at(r_area_id)) != cntry_map->end())
+            if (cntry_map->at(area_govt_map->at(r_area_id)).unit_measure == 'M') return false;
+
+    return true;
+}
+
+/**
  * \brief adds maxheight, maxwidth, maxlength, maxweight and maxaxleload tags.
  */
-void add_additional_restrictions(uint64_t link_id, cdms_map_type* cdms_map, cnd_mod_map_type* cnd_mod_map,
-        osmium::builder::TagListBuilder* builder) {
+void add_additional_restrictions(osmium::builder::TagListBuilder* builder, uint64_t link_id, uint64_t l_area_id,
+        uint64_t r_area_id, cdms_map_type* cdms_map, cnd_mod_map_type* cnd_mod_map,
+        area_id_govt_code_map_type* area_govt_map, cntry_ref_map_type* cntry_map) {
     if (!cdms_map || !cnd_mod_map) return;
+
+    // default is metric units
+    bool imperial_units = false;
+    if (area_govt_map && cntry_map) imperial_units = is_imperial(l_area_id, r_area_id, area_govt_map, cntry_map);
+
     auto range = cdms_map->equal_range(link_id);
     for (auto it = range.first; it != range.second; ++it) {
         cond_id_type cond_id = it->second;
@@ -185,17 +212,16 @@ void add_additional_restrictions(uint64_t link_id, cdms_map_type* cdms_map, cnd_
             auto mod_type = mod_group.mod_type;
             auto mod_val = mod_group.mod_val;
 
-            // todo add imperial units if in USA
             if (mod_type == MT_HEIGHT_RESTRICTION) {
-                builder->add_tag("maxheight", float_to_cstring(cm_to_m(mod_val)));
+               builder->add_tag("maxheight", imperial_units ? inch_to_feet(mod_val) : cm_to_m(mod_val));
             } else if (mod_type == MT_WIDTH_RESTRICTION) {
-                builder->add_tag("maxwidth", float_to_cstring(cm_to_m(mod_val)));
+                builder->add_tag("maxwidth", imperial_units ? inch_to_feet(mod_val) : cm_to_m(mod_val));
             } else if (mod_type == MT_LENGTH_RESTRICTION) {
-                builder->add_tag("maxlength", float_to_cstring(cm_to_m(mod_val)));
+                builder->add_tag("maxlength", imperial_units ? inch_to_feet(mod_val) : cm_to_m(mod_val));
             } else if (mod_type == MT_WEIGHT_RESTRICTION) {
-                builder->add_tag("maxweight", float_to_cstring(kg_to_t(mod_val)));
+                builder->add_tag("maxweight", imperial_units ? lbs_to_metric_ton(mod_val) : kg_to_t(mod_val));
             } else if (mod_type == MT_WEIGHT_PER_AXLE_RESTRICTION) {
-                builder->add_tag("maxaxleload", float_to_cstring(kg_to_t(mod_val)));
+                builder->add_tag("maxaxleload", imperial_units ? lbs_to_metric_ton(mod_val) : kg_to_t(mod_val));
             }
         }
     }
@@ -262,7 +288,8 @@ void add_highway_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f, u
  * \return link id of processed feature.
  */
 uint64_t parse_street_tags(osmium::builder::TagListBuilder *builder, OGRFeature* f, cdms_map_type* cdms_map = nullptr,
-        cnd_mod_map_type* cnd_mod_map = nullptr) {
+        cnd_mod_map_type* cnd_mod_map = nullptr, area_id_govt_code_map_type* area_govt_map = nullptr,
+        cntry_ref_map_type* cntry_map = nullptr) {
     const char* link_id_s = get_field_from_feature(f, LINK_ID);
     uint64_t link_id = std::stoul(link_id_s);
     builder->add_tag(LINK_ID, link_id_s); // tag for debug purpose
@@ -274,8 +301,11 @@ uint64_t parse_street_tags(osmium::builder::TagListBuilder *builder, OGRFeature*
         add_highway_tags(builder, f, link_id, cdms_map, cnd_mod_map);
     }
 
+    uint64_t l_area_id = get_uint_from_feature(f, L_AREA_ID);
+    uint64_t r_area_id = get_uint_from_feature(f, R_AREA_ID);
     // tags which apply to highways and ferry routes
-    add_additional_restrictions(link_id, cdms_map, cnd_mod_map, builder);
+    add_additional_restrictions(builder, link_id, l_area_id, r_area_id, cdms_map, cnd_mod_map, area_govt_map,
+            cntry_map);
     add_here_speed_cat_tag(builder, f);
 
     return link_id;

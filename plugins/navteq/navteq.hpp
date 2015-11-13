@@ -70,6 +70,9 @@ cnd_mod_map_type g_cnd_mod_map;
 
 // map for conditional driving manoeuvres
 cdms_map_type g_cdms_map;
+std::map<area_id_type, govt_code_type> g_area_to_govt_code_map;
+cntry_ref_map_type g_cntry_ref_map;
+
 // current layer
 OGRLayer* cur_layer;
 
@@ -179,7 +182,8 @@ size_t write_turn_restriction(std::vector<osmium::unsigned_object_id_type> *osm_
 uint64_t build_tag_list(osmium::builder::Builder* builder, osmium::memory::Buffer& buf, short z_level = -5) {
     osmium::builder::TagListBuilder tl_builder(buf, builder);
 
-    uint64_t link_id = parse_street_tags(&tl_builder, cur_feat, &g_cdms_map, &g_cnd_mod_map);
+    uint64_t link_id = parse_street_tags(&tl_builder, cur_feat, &g_cdms_map, &g_cnd_mod_map, &g_area_to_govt_code_map,
+            &g_cntry_ref_map);
 
     if (z_level != -5) tl_builder.add_tag("layer", std::to_string(z_level).c_str());
     if (link_id == 0) throw(format_error("layers column field '" + std::string(LINK_ID) + "' is missing"));
@@ -886,6 +890,51 @@ void process_turn_restrictions(DBFHandle rdms_handle, DBFHandle cdms_handle) {
     }
 }
 
+void init_g_cnd_mod_map(const std::string& dir, std::ostream& out) {
+    DBFHandle cnd_mod_handle = read_dbf_file(dir + CND_MOD_DBF, out);
+    for (int i = 0; i < DBFGetRecordCount(cnd_mod_handle); i++) {
+        cond_id_type cond_id = dbf_get_uint_by_field(cnd_mod_handle, i, COND_ID);
+        // std::string lang_code = dbf_get_string_by_field(cnd_mod_handle, i, LANG_CODE);
+        mod_typ_type mod_type = dbf_get_uint_by_field(cnd_mod_handle, i, CM_MOD_TYPE);
+        mod_val_type mod_val = dbf_get_uint_by_field(cnd_mod_handle, i, CM_MOD_VAL);
+        g_cnd_mod_map.insert(std::make_pair(cond_id, mod_group_type(mod_type, mod_val)));
+    }
+    DBFClose(cnd_mod_handle);
+}
+
+void init_g_cdms_map(const std::string& dir, std::ostream& out) {
+    DBFHandle cdms_handle = read_dbf_file(dir + CDMS_DBF, out);
+    for (int i = 0; i < DBFGetRecordCount(cdms_handle); i++) {
+        uint64_t link_id = dbf_get_uint_by_field(cdms_handle, i, LINK_ID);
+        uint64_t cond_id = dbf_get_uint_by_field(cdms_handle, i, COND_ID);
+        g_cdms_map.insert(std::make_pair(link_id, cond_id));
+    }
+    DBFClose(cdms_handle);
+}
+
+void init_g_area_to_govt_code_map(const std::string& dir, std::ostream& out) {
+    DBFHandle mtd_area_handle = read_dbf_file(dir + MTD_AREA_DBF, out);
+    for (int i = 0; i < DBFGetRecordCount(mtd_area_handle); i++) {
+        area_id_type area_id = dbf_get_uint_by_field(mtd_area_handle, i, AREA_ID);
+        govt_code_type govt_code = dbf_get_uint_by_field(mtd_area_handle, i, GOVT_CODE);
+        g_area_to_govt_code_map.insert(std::make_pair(area_id, govt_code));
+    }
+    DBFClose(mtd_area_handle);
+}
+
+void init_g_cntry_ref_map(const std::string& dir, std::ostream& out) {
+    DBFHandle cntry_ref_handle = read_dbf_file(dir + MTD_CNTRY_REF_DBF, out);
+    for (int i = 0; i < DBFGetRecordCount(cntry_ref_handle); i++) {
+        govt_code_type govt_code = dbf_get_uint_by_field(cntry_ref_handle, i, GOVT_CODE);
+        auto unit_measure = dbf_get_string_by_field(cntry_ref_handle, i, UNTMEASURE);
+        auto speed_limit_unit = dbf_get_string_by_field(cntry_ref_handle, i, SPEEDLIMITUNIT);
+        auto iso_code = dbf_get_string_by_field(cntry_ref_handle, i, ISO_CODE);
+        auto cntry_ref = cntry_ref_type(unit_measure.c_str()[0], speed_limit_unit.c_str(), iso_code.c_str());
+        g_cntry_ref_map.insert(std::make_pair(govt_code, cntry_ref));
+    }
+    DBFClose(cntry_ref_handle);
+}
+
 /****************************************************
  * adds layers to osmium:
  *      cur_layer and cur_feature have to be set
@@ -906,26 +955,14 @@ void add_street_shape_to_osmium(OGRLayer *layer, std::string dir = std::string()
 // Maps link_ids to pairs of indices and z-levels of waypoints with z-levels not equal 0.
     z_lvl_map z_level_map = process_z_levels(read_dbf_file(dir + sub_dir_for_testing + ZLEVELS_DBF, out));
 
-    if ( dbf_file_exists(dir + CND_MOD_DBF)){
-        DBFHandle cnd_mod_handle = read_dbf_file(dir + CND_MOD_DBF, out);
-        for (int i = 0; i < DBFGetRecordCount(cnd_mod_handle); i++) {
-            cond_id_type cond_id = dbf_get_uint_by_field(cnd_mod_handle, i, COND_ID);
-            // std::string lang_code = dbf_get_string_by_field(cnd_mod_handle, i, LANG_CODE);
-            mod_typ_type mod_type = dbf_get_uint_by_field(cnd_mod_handle, i, CM_MOD_TYPE);
-            mod_val_type mod_val = dbf_get_uint_by_field(cnd_mod_handle, i, CM_MOD_VAL);
-            g_cnd_mod_map.insert(std::make_pair(cond_id, mod_group_type(mod_type, mod_val)));
-        }
-        DBFClose(cnd_mod_handle);
+    if (dbf_file_exists(dir + CND_MOD_DBF) && dbf_file_exists(dir + CDMS_DBF)){
+        init_g_cnd_mod_map(dir, out);
+        init_g_cdms_map(dir, out);
     }
 
-    if (dbf_file_exists(dir + CDMS_DBF)){
-        DBFHandle cdms_handle = read_dbf_file(dir + CDMS_DBF, out);
-        for (int i = 0; i < DBFGetRecordCount(cdms_handle); i++) {
-            uint64_t link_id = dbf_get_uint_by_field(cdms_handle, i, LINK_ID);
-            uint64_t cond_id = dbf_get_uint_by_field(cdms_handle, i, COND_ID);
-            g_cdms_map.insert(std::make_pair(link_id, cond_id));
-        }
-        DBFClose(cdms_handle);
+    if (dbf_file_exists(dir + MTD_AREA_DBF) && dbf_file_exists(dir + MTD_CNTRY_REF_DBF)) {
+        init_g_area_to_govt_code_map(dir, out);
+        init_g_cntry_ref_map(dir, out);
     }
 
 // get all nodes which may be a routable crossing
