@@ -49,11 +49,11 @@ bool navteq_plugin::check_input(const char* input_path, const char* output_file)
     }
 
     if (!shp_file_exists(input_path + STREETS_SHP)) return false;
-    if (!shp_file_exists(input_path + ADMINBNDY_1_SHP)) std::cerr << "administrative boundaries level 1 are missing\n";//return false;
-    if (!shp_file_exists(input_path + ADMINBNDY_2_SHP)) std::cerr << "administrative boundaries level 2 are missing\n";//return false;
-    if (!shp_file_exists(input_path + ADMINBNDY_3_SHP)) std::cerr << "administrative boundaries level 3 are missing\n";//return false;
-    if (!shp_file_exists(input_path + ADMINBNDY_4_SHP)) std::cerr << "administrative boundaries level 4 are missing\n";//return false;
-    if (!shp_file_exists(input_path + ADMINBNDY_5_SHP)) std::cerr << "administrative boundaries level 5 are missing\n";//return false;
+    if (!shp_file_exists(input_path + ADMINBNDY_1_SHP)) std::cerr << "administrative boundaries level 1 are missing\n";
+    if (!shp_file_exists(input_path + ADMINBNDY_2_SHP)) std::cerr << "administrative boundaries level 2 are missing\n";
+    if (!shp_file_exists(input_path + ADMINBNDY_3_SHP)) std::cerr << "administrative boundaries level 3 are missing\n";
+    if (!shp_file_exists(input_path + ADMINBNDY_4_SHP)) std::cerr << "administrative boundaries level 4 are missing\n";
+    if (!shp_file_exists(input_path + ADMINBNDY_5_SHP)) std::cerr << "administrative boundaries level 5 are missing\n";
 
     if (!dbf_file_exists(input_path + MTD_AREA_DBF)) return false;
     if (!dbf_file_exists(input_path + RDMS_DBF)) return false;
@@ -85,6 +85,7 @@ void navteq_plugin::execute() {
         add_admin_shape_to_osmium(read_shape_file(input_path + ADMINBNDY_4_SHP), input_path);
     if (shp_file_exists(input_path + ADMINBNDY_5_SHP))
         add_admin_shape_to_osmium(read_shape_file(input_path + ADMINBNDY_5_SHP), input_path);
+    g_mtd_area_map.clear();
 
     std::string output = output_path;
     if (!output.empty()) {

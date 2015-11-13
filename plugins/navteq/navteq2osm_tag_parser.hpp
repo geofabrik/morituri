@@ -121,10 +121,6 @@ std::string to_camel_case_with_spaces(const char* camel) {
  * \brief adds maxspeed tag
  */
 void add_maxspeed_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f) {
-    // debug
-    // builder->add_tag("FR_SPD_LIM", get_field_from_feature(f, FR_SPEED_LIMIT));
-    // builder->add_tag("TO_SPD_LIM", get_field_from_feature(f, TO_SPEED_LIMIT));
-
     const char* from_speed_limit_s = strdup(get_field_from_feature(f, FR_SPEED_LIMIT));
     const char* to_speed_limit_s = strdup(get_field_from_feature(f, TO_SPEED_LIMIT));
 

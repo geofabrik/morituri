@@ -739,15 +739,17 @@ void create_admin_boundary_polygon(OGRPolygon* poly) {
  * \brief adds administrative boundaries as Relations to m_buffer
  */
 void process_admin_boundaries() {
-    auto geom_type = cur_feat->GetGeometryRef()->getGeometryType();
-
-    if (geom_type == wkbMultiPolygon) create_admin_boundary_multipolygon(
-            static_cast<OGRMultiPolygon*>(cur_feat->GetGeometryRef()));
-    else if (geom_type == wkbPolygon) create_admin_boundary_polygon(
-            static_cast<OGRPolygon*>(cur_feat->GetGeometryRef()));
-    else throw(std::runtime_error(
-            "Adminboundaries with geometry=" + std::string(cur_feat->GetGeometryRef()->getGeometryName())
-                    + " are not yet supported."));
+    auto geom = cur_feat->GetGeometryRef();
+    auto geom_type = geom->getGeometryType();
+    if (geom_type == wkbMultiPolygon) {
+        create_admin_boundary_multipolygon(static_cast<OGRMultiPolygon*>(geom));
+    } else if (geom_type == wkbPolygon) {
+        create_admin_boundary_polygon(static_cast<OGRPolygon*>(geom));
+    } else {
+        throw(std::runtime_error(
+                "Adminboundaries with geometry=" + std::string(geom->getGeometryName())
+                        + " are not yet supported."));
+    }
 
     g_node_buffer.commit();
     g_way_buffer.commit();
@@ -1014,15 +1016,16 @@ void add_admin_shape_to_osmium(OGRLayer *layer, std::string dir = std::string(),
     assert(layer->GetGeomType() == wkbPolygon);
     cur_layer = layer;
 
-    std::ostream& out = sub_dir_for_testing.empty() ? std::cerr : cnull;
-
-    process_meta_areas(read_dbf_file(dir + sub_dir_for_testing + MTD_AREA_DBF, out));
+    if(g_mtd_area_map.empty()){
+        std::ostream& out = sub_dir_for_testing.empty() ? std::cerr : cnull;
+        process_meta_areas(read_dbf_file(dir + sub_dir_for_testing + MTD_AREA_DBF, out));
+    }
 
     while ((cur_feat = cur_layer->GetNextFeature()) != NULL) {
         process_admin_boundaries();
         delete cur_feat;
     }
-    g_mtd_area_map.clear();
+
     delete layer;
 }
 
