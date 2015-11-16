@@ -511,6 +511,21 @@ void middle_points_preparation(OGRLineString* ogr_ls,
 }
 
 /**
+ * \brief replaces all z-levels by zero, which are not an endpoint
+ * \param z_lvl_vec vector containing pairs of [z_lvl_index, z_lvl]
+ */
+void set_ferry_z_lvls_to_zero(std::vector<std::pair<ushort, z_lvl_type> >& z_lvl_vec) {
+    // erase middle z_lvls
+    if (z_lvl_vec.size() > 2) z_lvl_vec.erase(z_lvl_vec.begin() + 1, z_lvl_vec.end() - 1);
+    // erase first z_lvl if first index references first node
+    if (z_lvl_vec.size() > 0 && z_lvl_vec.begin()->first != 0) z_lvl_vec.erase(z_lvl_vec.begin());
+    // erase last z_lvl if last index references last node
+    OGRLineString* ogr_ls = static_cast<OGRLineString*>(cur_feat->GetGeometryRef());
+    if (z_lvl_vec.size() > 0 && (z_lvl_vec.end() - 1)->first != ogr_ls->getNumPoints() - 1)
+        z_lvl_vec.erase(z_lvl_vec.end());
+}
+
+/**
  * \brief creates Way from linestring.
  * 		  creates missing Nodes needed for Way and Way itself.
  * \param ogr_ls linestring which provides the geometry.
@@ -546,6 +561,9 @@ void process_way(OGRLineString *ogr_ls, z_lvl_map *z_level_map) {
         process_last_end_point(last_index, last_z_lvl, ogr_ls, z_level_map, node_ref_map);
 
         g_way_buffer.commit();
+
+        bool ferry = is_ferry(get_field_from_feature(cur_feat, FERRY));
+        if (ferry) set_ferry_z_lvls_to_zero(it->second);
 
         split_way_by_z_level(ogr_ls, &it->second, &node_ref_map, link_id);
     }
