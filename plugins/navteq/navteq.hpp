@@ -185,7 +185,7 @@ uint64_t build_tag_list(osmium::builder::Builder* builder, osmium::memory::Buffe
     uint64_t link_id = parse_street_tags(&tl_builder, cur_feat, &g_cdms_map, &g_cnd_mod_map, &g_area_to_govt_code_map,
             &g_cntry_ref_map);
 
-    if (z_level != -5) tl_builder.add_tag("layer", std::to_string(z_level).c_str());
+    if (z_level != -5 && z_level != 0) tl_builder.add_tag("layer", std::to_string(z_level).c_str());
     if (link_id == 0) throw(format_error("layers column field '" + std::string(LINK_ID) + "' is missing"));
     return link_id;
 }

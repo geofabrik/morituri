@@ -121,6 +121,7 @@ TEST_CASE("split subway", "[split subway]") {
                 CAPTURE(test.z_lvls);
 
                 const char* osm_z_lvl = obj->get_value_by_key("layer");
+                if (!osm_z_lvl) osm_z_lvl = "0";
                 CAPTURE(osm_z_lvl);
                 CAPTURE(std::stoi(osm_z_lvl));
                 CAPTURE(test.supposed_way_z_lvls.at(ctr));
