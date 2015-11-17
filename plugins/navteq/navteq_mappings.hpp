@@ -31,6 +31,17 @@ const std::string ZLEVELS_DBF = "Zlevels.dbf";
 // STREETS columns
 const char* LINK_ID = "LINK_ID";
 const char* ST_NAME = "ST_NAME";
+
+const char* ADDR_TYPE = "ADDR_TYPE";
+const char* L_REFADDR = "L_REFADDR";
+const char* L_NREFADDR = "L_NREFADDR";
+const char* L_ADDRSCH = "L_ADDRSCH";
+const char* L_ADDRFORM = "L_ADDRFORM";
+const char* R_REFADDR = "R_REFADDR";
+const char* R_NREFADDR = "R_NREFADDR";
+const char* R_ADDRSCH = "R_ADDRSCH";
+const char* R_ADDRFORM = "R_ADDRFORM";
+
 const char* FUNC_CLASS = "FUNC_CLASS";
 const char* SPEED_CAT = "SPEED_CAT";
 const char* FR_SPEED_LIMIT = "FR_SPD_LIM";

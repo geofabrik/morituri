@@ -13,7 +13,6 @@
 #include <iostream>
 
 #include <gdal/ogrsf_frmts.h>
-#include <geos/geom/Geometry.h>
 
 #include <osmium/osm/item_type.hpp>
 #include <osmium/osm/types.hpp>
@@ -213,6 +212,17 @@ osmium::unsigned_object_id_type build_node(osmium::Location location, osmium::bu
 osmium::unsigned_object_id_type build_node(osmium::Location location) {
     osmium::builder::NodeBuilder builder(g_node_buffer);
     return build_node(location, &builder);
+}
+
+osmium::unsigned_object_id_type build_node_with_tag(osmium::Location location, const char* tag_key,
+        const char* tag_val) {
+    osmium::builder::NodeBuilder node_builder(g_node_buffer);
+    auto node_id = build_node(location, &node_builder);
+    if (tag_key) {
+        osmium::builder::TagListBuilder tl_builder(g_node_buffer, &node_builder);
+        tl_builder.add_tag(tag_key, tag_val);
+    }
+    return node_id;
 }
 
 /**
@@ -525,6 +535,51 @@ void set_ferry_z_lvls_to_zero(std::vector<std::pair<ushort, z_lvl_type> >& z_lvl
         z_lvl_vec.erase(z_lvl_vec.end());
 }
 
+void create_house_numbers(OGRLineString* ogr_ls, bool left){
+    const char* ref_addr = left ? L_REFADDR : R_REFADDR;
+    const char* nref_addr = left ? L_NREFADDR : R_NREFADDR;
+    const char* addr_schema = left ? L_ADDRSCH : R_ADDRSCH;
+
+    if (!strcmp(get_field_from_feature(cur_feat, ref_addr),"")) return;
+    if (!strcmp(get_field_from_feature(cur_feat, nref_addr),"")) return;
+    if (!strcmp(get_field_from_feature(cur_feat, addr_schema),"")) return;
+    if (!strcmp(get_field_from_feature(cur_feat, addr_schema),"M")) return;
+
+    OGRLineString* offset_ogr_ls = create_offset_curve(ogr_ls, 0.00005, left);
+
+    osmium::builder::WayBuilder way_builder(g_way_buffer);
+    STATIC_WAY(way_builder.object()).set_id(g_osm_id++);
+    set_dummy_osm_object_attributes(STATIC_OSMOBJECT(way_builder.object()));
+    way_builder.add_user(USER);
+    osmium::builder::WayNodeListBuilder wnl_builder(g_way_buffer, &way_builder);
+    for (int i = 0; i < offset_ogr_ls->getNumPoints(); i++) {
+        osmium::Location location(offset_ogr_ls->getX(i), offset_ogr_ls->getY(i));
+        assert(location.valid());
+        osmium::unsigned_object_id_type node_id;
+        if (i == 0) {
+            node_id = build_node_with_tag(location, "addr:housenumber", get_field_from_feature(cur_feat, ref_addr));
+        } else if (i == offset_ogr_ls->getNumPoints() - 1) {
+            node_id = build_node_with_tag(location, "addr:housenumber", get_field_from_feature(cur_feat, nref_addr));
+        } else {
+            node_id = build_node(location);
+        }
+
+        wnl_builder.add_node_ref(osmium::NodeRef(node_id, location));
+    }
+    {
+        osmium::builder::TagListBuilder tl_builder(g_way_buffer, &way_builder);
+        const char* schema = parse_house_number_schema(get_field_from_feature(cur_feat, addr_schema));
+        tl_builder.add_tag("addr:interpolation", schema);
+    }
+    g_node_buffer.commit();
+    g_way_buffer.commit();
+}
+
+void create_house_numbers(OGRLineString* ogr_ls) {
+    create_house_numbers(ogr_ls, true);
+    create_house_numbers(ogr_ls, false);
+}
+
 /**
  * \brief creates Way from linestring.
  * 		  creates missing Nodes needed for Way and Way itself.
@@ -566,6 +621,10 @@ void process_way(OGRLineString *ogr_ls, z_lvl_map *z_level_map) {
         if (ferry) set_ferry_z_lvls_to_zero(it->second);
 
         split_way_by_z_level(ogr_ls, &it->second, &node_ref_map, link_id);
+    }
+
+    if (!strcmp(get_field_from_feature(cur_feat, ADDR_TYPE),"B")){
+        create_house_numbers(ogr_ls);
     }
 }
 
