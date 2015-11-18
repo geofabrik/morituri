@@ -19,6 +19,11 @@
 #include "../plugins/comm2osm_exceptions.hpp"
 #include "readers.hpp"
 
+#include <geos/io/WKBReader.h>
+#include <geos/io/WKBWriter.h>
+
+#include <geos/geom/LineString.h>
+#include <geos/operation/buffer/BufferParameters.h>
 
 const int INCH_BASE = 12;
 const int POUND_BASE = 2000;
@@ -189,4 +194,53 @@ void init_map_at_element(std::map<Type1, Type2> *map, Type1 key, osmium::unsigne
 
 boost::iostreams::stream<boost::iostreams::null_sink> cnull((boost::iostreams::null_sink()));
 
+/**
+ * Following functions convert OGRGeometry to geos::geom::Geometry and vice versa
+ */
+
+std::string ogr2wkb(OGRGeometry *ogr_geom) {
+    if (!ogr_geom || ogr_geom->IsEmpty()) throw std::runtime_error("geometry is nullptr");
+    unsigned char staticbuffer[1024 * 1024];
+    unsigned char *buffer = staticbuffer;
+    size_t wkb_size = ogr_geom->WkbSize();
+    if (wkb_size > sizeof(staticbuffer)) buffer = (unsigned char *) malloc(wkb_size);
+    ogr_geom->exportToWkb(wkbXDR, buffer);
+    std::string wkb((const char*) buffer, wkb_size);
+    if (buffer != staticbuffer) free(buffer);
+    return wkb;
+}
+
+geos::io::WKBReader* wkb_reader;
+geos::geom::Geometry* wkb2geos(std::string wkb) {
+    if (!wkb_reader) wkb_reader = new geos::io::WKBReader();
+    std::istringstream ss(wkb);
+    geos::geom::Geometry *geos_geom = wkb_reader->read(ss);
+    if (!geos_geom) throw std::runtime_error("creating geos::geom::Geometry from wkb failed");
+    return geos_geom;
+}
+
+geos::geom::Geometry* ogr2geos(OGRGeometry* ogr_geom){
+    if (!ogr_geom || ogr_geom->IsEmpty()) throw std::runtime_error("geometry is nullptr");
+    return wkb2geos(ogr2wkb(ogr_geom));
+}
+
+geos::io::WKBWriter* wkb_writer;
+std::string geos2wkb(const geos::geom::Geometry *geos_geom) {
+    if (!wkb_writer) wkb_writer = new geos::io::WKBWriter();
+    std::ostringstream ss;
+    wkb_writer->setOutputDimension(geos_geom->getCoordinateDimension());
+    wkb_writer->write(*geos_geom, ss);
+    return ss.str();
+}
+
+OGRGeometry* wkb2ogr(std::string wkb) {
+    OGRGeometry *ogr_geom;
+    OGRErr res = OGRGeometryFactory::createFromWkb((unsigned char*) (wkb.c_str()), nullptr, &ogr_geom, wkb.size());
+    if (res != OGRERR_NONE) throw std::runtime_error("creating OGRGeometry from wkb failed: " + std::to_string(res));
+    return ogr_geom;
+}
+
+OGRGeometry* geos2ogr(const geos::geom::Geometry *geos_geom){
+    return wkb2ogr(geos2wkb(geos_geom));
+}
 #endif /* UTIL_HPP_ */
