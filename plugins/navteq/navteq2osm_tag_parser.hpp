@@ -138,7 +138,7 @@ void add_maxspeed_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f) 
 
     // 999 means no speed limit at all
     const char* from = from_speed_limit == 999 ? "none" : from_speed_limit_s;
-    const char* to = from_speed_limit == 999 ? "none" : to_speed_limit_s;
+    const char* to = to_speed_limit == 999 ? "none" : to_speed_limit_s;
 
     if (from_speed_limit != 0 && to_speed_limit != 0) {
         if (from_speed_limit != to_speed_limit) {
@@ -153,7 +153,10 @@ void add_maxspeed_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f) 
         builder->add_tag("maxspeed", to);
     }
 
-    if (from_speed_limit > 130 || to_speed_limit > 130) std::cerr << "Warning: Found speed limit > 130" << std::endl;
+    if (from_speed_limit > 130 && from_speed_limit < 999)
+        std::cerr << "Warning: Found speed limit > 130 (from_speed_limit): " << from_speed_limit << std::endl;
+    if (to_speed_limit > 130 && to_speed_limit < 999)
+        std::cerr << "Warning: Found speed limit > 130 (to_speed_limit): " << to_speed_limit << std::endl;
 }
 
 /**
