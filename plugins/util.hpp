@@ -160,22 +160,28 @@ bool string_is_not_unsigned_integer(std::string s) {
 
 template <class T>
 std::string kg_to_t(T kilo){
-    return std::to_string(kilo/1000.0f);
+    std::stringstream stream;
+    stream << kilo/1000.0f;
+    return stream.str();
 }
 
 template <class T>
 std::string cm_to_m(T meter){
-    return std::to_string(meter/100.0f);
+    std::stringstream stream;
+    stream << meter/100.0f;
+    return stream.str();
 }
 
 std::string inch_to_feet(unsigned int inches) {
     return std::to_string((unsigned int) floor(inches / INCH_BASE)) + "'" + std::to_string(inches % INCH_BASE) + "\"";
 }
 
-std::string lbs_to_metric_ton(unsigned int lbs){
-    float short_ton = lbs / (float) POUND_BASE;
-    float metric_ton = short_ton * SHORT_TON;
-    return std::to_string(metric_ton);
+std::string lbs_to_metric_ton(double lbs){
+    double short_ton = lbs / (double) POUND_BASE;
+    double metric_ton = short_ton * SHORT_TON;
+    std::stringstream stream;
+    stream << metric_ton;
+    return stream.str();
 }
 
 /* unused */
@@ -208,7 +214,7 @@ std::string ogr2wkb(OGRGeometry *ogr_geom) {
     unsigned char *buffer = staticbuffer;
     size_t wkb_size = ogr_geom->WkbSize();
     if (wkb_size > sizeof(staticbuffer)) buffer = (unsigned char *) malloc(wkb_size);
-    ogr_geom->exportToWkb(wkbXDR, buffer);
+    ogr_geom->exportToWkb(wkbNDR, buffer);
     std::string wkb((const char*) buffer, wkb_size);
     if (buffer != staticbuffer) free(buffer);
     return wkb;
