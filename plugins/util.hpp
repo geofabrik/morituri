@@ -15,6 +15,7 @@
 #include <sstream>
 #include "boost/iostreams/stream.hpp"
 #include "boost/iostreams/device/null.hpp"
+#include <boost/filesystem/path.hpp>
 
 #include "../plugins/comm2osm_exceptions.hpp"
 #include "readers.hpp"
@@ -65,6 +66,10 @@ bool shp_file_exists(std::string shp_file) {
     return shp_file_exists(shp_file.c_str());
 }
 
+bool shp_file_exists(boost::filesystem::path shp_file) {
+    return shp_file_exists(shp_file.c_str());
+}
+
 /**
 
  * \brief Checks DBF file existance and validity
@@ -83,6 +88,10 @@ bool dbf_file_exists(const char* dbf_file) {
 }
 
 bool dbf_file_exists(std::string dbf_file) {
+    return dbf_file_exists(dbf_file.c_str());
+}
+
+bool dbf_file_exists(boost::filesystem::path dbf_file) {
     return dbf_file_exists(dbf_file.c_str());
 }
 

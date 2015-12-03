@@ -37,9 +37,43 @@ bool navteq_plugin::is_valid_format(std::string filename) {
     return false;
 }
 
+bool navteq_plugin::check_files(boost::filesystem::path dir ){
+    std::cout << "check_files: " << dir << std::endl;
+    if (!shp_file_exists(boost::filesystem::path(dir / STREETS_SHP))) return false;
+    if (!shp_file_exists(boost::filesystem::path(dir / ADMINBNDY_1_SHP))) std::cerr << "administrative boundaries level 1 are missing\n";
+    if (!shp_file_exists(boost::filesystem::path(dir / ADMINBNDY_2_SHP))) std::cerr << "administrative boundaries level 2 are missing\n";
+    if (!shp_file_exists(boost::filesystem::path(dir / ADMINBNDY_3_SHP))) std::cerr << "administrative boundaries level 3 are missing\n";
+    if (!shp_file_exists(boost::filesystem::path(dir / ADMINBNDY_4_SHP))) std::cerr << "administrative boundaries level 4 are missing\n";
+    if (!shp_file_exists(boost::filesystem::path(dir / ADMINBNDY_5_SHP))) std::cerr << "administrative boundaries level 5 are missing\n";
+
+    if (!dbf_file_exists(boost::filesystem::path(dir / MTD_AREA_DBF ))) return false;
+    if (!dbf_file_exists(boost::filesystem::path(dir / RDMS_DBF     ))) return false;
+    if (!dbf_file_exists(boost::filesystem::path(dir / CDMS_DBF     ))) return false;
+    if (!dbf_file_exists(boost::filesystem::path(dir / ZLEVELS_DBF  ))) return false;
+    return true;
+}
+
+/**
+ * \brief Checks wether there is a subdirectory containinig valid data.
+ * \param dir directory from which to start recursion
+ * \param recur if set non-directories within the root directory are ignored
+ * \return Existance of valid data in a subdirectory.
+ */
+
+bool navteq_plugin::recurse_dir(boost::filesystem::path dir, bool recur) {
+    std::cout << "recurse_dir " << dir.c_str() << std::endl;
+    for (auto& itr : boost::make_iterator_range(boost::filesystem::directory_iterator(dir), { })) {
+        if (boost::filesystem::is_directory(itr)) if (recurse_dir(itr, false)) return true;
+        else if (check_files(boost::filesystem::path(itr).c_str())) return true;
+    }
+    return false;
+}
+
 bool navteq_plugin::check_input(const char* input_path, const char* output_file) {
+
     if (!boost::filesystem::is_directory(input_path))
         throw(std::runtime_error("directory " + std::string(input_path) + " does not exist"));
+
     if (output_file) {
         std::string output_path = boost::filesystem::path(output_file).parent_path().string();
         if (!boost::filesystem::is_directory(output_path))
@@ -48,17 +82,7 @@ bool navteq_plugin::check_input(const char* input_path, const char* output_file)
             throw(format_error("unknown format for outputfile: " + std::string(output_file)));
     }
 
-    if (!shp_file_exists(input_path + STREETS_SHP)) return false;
-    if (!shp_file_exists(input_path + ADMINBNDY_1_SHP)) std::cerr << "administrative boundaries level 1 are missing\n";
-    if (!shp_file_exists(input_path + ADMINBNDY_2_SHP)) std::cerr << "administrative boundaries level 2 are missing\n";
-    if (!shp_file_exists(input_path + ADMINBNDY_3_SHP)) std::cerr << "administrative boundaries level 3 are missing\n";
-    if (!shp_file_exists(input_path + ADMINBNDY_4_SHP)) std::cerr << "administrative boundaries level 4 are missing\n";
-    if (!shp_file_exists(input_path + ADMINBNDY_5_SHP)) std::cerr << "administrative boundaries level 5 are missing\n";
-
-    if (!dbf_file_exists(input_path + MTD_AREA_DBF)) return false;
-    if (!dbf_file_exists(input_path + RDMS_DBF)) return false;
-    if (!dbf_file_exists(input_path + CDMS_DBF)) return false;
-    if (!dbf_file_exists(input_path + ZLEVELS_DBF)) return false;
+    if (!recurse_dir(input_path)) return false;
 
     this->plugin_setup(input_path, output_file);
     return true;

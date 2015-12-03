@@ -9,10 +9,13 @@
 #define NAVTEQPLUGIN_HPP_
 
 #include "../base_plugin.hpp"
+#include <boost/filesystem/path.hpp>
 
 class navteq_plugin: public base_plugin {
 private:
     bool is_valid_format(std::string format);
+    bool check_files(boost::filesystem::path dir);
+    bool recurse_dir(boost::filesystem::path dir, bool recur = true);
 
 public:
 
