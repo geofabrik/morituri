@@ -15,7 +15,7 @@ public:
     dummy_plugin();
     virtual ~dummy_plugin();
 
-    bool check_input(const char* input_path, const char* output_path = nullptr);
+    bool check_input(boost::filesystem::path input_path, boost::filesystem::path output_path = boost::filesystem::path());
     void execute();
 };
 

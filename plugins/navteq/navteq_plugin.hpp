@@ -10,19 +10,22 @@
 
 #include "../base_plugin.hpp"
 #include <boost/filesystem/path.hpp>
+#include <string>
 
 class navteq_plugin: public base_plugin {
 private:
     bool is_valid_format(std::string format);
+    void recurse_dir(boost::filesystem::path dir, bool recur = true);
     bool check_files(boost::filesystem::path dir);
-    bool recurse_dir(boost::filesystem::path dir, bool recur = true);
+    std::vector<boost::filesystem::path> sub_dirs;
 
 public:
 
     navteq_plugin();
     virtual ~navteq_plugin();
 
-    bool check_input(const char* input_path, const char* output_path = nullptr);
+    bool check_input(boost::filesystem::path input_path, boost::filesystem::path output_path =
+            boost::filesystem::path());
     void execute();
 
 };

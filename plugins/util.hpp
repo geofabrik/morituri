@@ -13,9 +13,10 @@
 #include <shapefil.h>
 #include <osmium/osm/types.hpp>
 #include <sstream>
-#include "boost/iostreams/stream.hpp"
-#include "boost/iostreams/device/null.hpp"
+#include <boost/iostreams/stream.hpp>
+#include <boost/iostreams/device/null.hpp>
 #include <boost/filesystem/path.hpp>
+#include <map>
 
 #include "../plugins/comm2osm_exceptions.hpp"
 #include "readers.hpp"

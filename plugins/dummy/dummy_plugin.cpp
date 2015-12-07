@@ -15,7 +15,7 @@ dummy_plugin::dummy_plugin() {
 dummy_plugin::~dummy_plugin() {
 }
 
-bool dummy_plugin::check_input(const char* input_path, const char* output_path) {
+bool dummy_plugin::check_input(boost::filesystem::path input_path, boost::filesystem::path output_path) {
     return true;
 }
 

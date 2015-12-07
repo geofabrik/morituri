@@ -9,6 +9,7 @@
 #define PLUGINS_READERS_HPP_
 
 #include <gdal/ogrsf_frmts.h>
+#include <boost/filesystem/path.hpp>
 
 #include "comm2osm_exceptions.hpp"
 
@@ -33,14 +34,14 @@ OGRLayer* read_shape_file(const char* shp_file, std::ostream& out = std::cerr) {
     return input_layer;
 }
 
-OGRLayer* read_shape_file(std::string shp_file, std::ostream& out = std::cerr) {
+OGRLayer* read_shape_file(boost::filesystem::path shp_file, std::ostream& out = std::cerr) {
     return read_shape_file(shp_file.c_str(), out);
 }
 
-DBFHandle read_dbf_file(std::string dbf_file, std::ostream& out = std::cerr) {
+DBFHandle read_dbf_file(boost::filesystem::path dbf_file, std::ostream& out = std::cerr) {
     out << "reading " << dbf_file << std::endl;
     DBFHandle handle = DBFOpen(dbf_file.c_str(), "rb");
-    if (handle == NULL) throw(dbf_error(dbf_file));
+    if (handle == NULL) throw(dbf_error(dbf_file.string()));
     return handle;
 }
 

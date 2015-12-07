@@ -19,6 +19,9 @@
 #include <osmium/osm/object.hpp>
 #include <osmium/builder/osm_object_builder.hpp>
 
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+
 #include "comm2osm_exceptions.hpp"
 #include "navteq2osm_tag_parser.hpp"
 #include "readers.hpp"
@@ -641,9 +644,7 @@ void process_way_end_nodes(OGRLineString *ogr_ls) {
 }
 
 // \brief stores z_levels in z_level_map for later use
-z_lvl_map process_z_levels(DBFHandle handle) {
-
-    z_lvl_map z_level_map;
+z_lvl_map process_z_levels(DBFHandle handle, z_lvl_map& z_level_map) {
 
     uint64_t last_link_id;
     std::vector<std::pair<ushort, z_lvl_type>> v;
@@ -969,8 +970,8 @@ void process_turn_restrictions(DBFHandle rdms_handle, DBFHandle cdms_handle) {
     }
 }
 
-void init_g_cnd_mod_map(const std::string& dir, std::ostream& out) {
-    DBFHandle cnd_mod_handle = read_dbf_file(dir + CND_MOD_DBF, out);
+void init_g_cnd_mod_map(const boost::filesystem::path& dir, std::ostream& out) {
+    DBFHandle cnd_mod_handle = read_dbf_file(dir / CND_MOD_DBF, out);
     for (int i = 0; i < DBFGetRecordCount(cnd_mod_handle); i++) {
         cond_id_type cond_id = dbf_get_uint_by_field(cnd_mod_handle, i, COND_ID);
         // std::string lang_code = dbf_get_string_by_field(cnd_mod_handle, i, LANG_CODE);
@@ -981,8 +982,8 @@ void init_g_cnd_mod_map(const std::string& dir, std::ostream& out) {
     DBFClose(cnd_mod_handle);
 }
 
-void init_g_cdms_map(const std::string& dir, std::ostream& out) {
-    DBFHandle cdms_handle = read_dbf_file(dir + CDMS_DBF, out);
+void init_g_cdms_map(const boost::filesystem::path& dir, std::ostream& out) {
+    DBFHandle cdms_handle = read_dbf_file(dir / CDMS_DBF, out);
     for (int i = 0; i < DBFGetRecordCount(cdms_handle); i++) {
         uint64_t link_id = dbf_get_uint_by_field(cdms_handle, i, LINK_ID);
         uint64_t cond_id = dbf_get_uint_by_field(cdms_handle, i, COND_ID);
@@ -991,8 +992,8 @@ void init_g_cdms_map(const std::string& dir, std::ostream& out) {
     DBFClose(cdms_handle);
 }
 
-void init_g_area_to_govt_code_map(const std::string& dir, std::ostream& out) {
-    DBFHandle mtd_area_handle = read_dbf_file(dir + MTD_AREA_DBF, out);
+void init_g_area_to_govt_code_map(const boost::filesystem::path& dir, std::ostream& out) {
+    DBFHandle mtd_area_handle = read_dbf_file(dir / MTD_AREA_DBF, out);
     for (int i = 0; i < DBFGetRecordCount(mtd_area_handle); i++) {
         area_id_type area_id = dbf_get_uint_by_field(mtd_area_handle, i, AREA_ID);
         govt_code_type govt_code = dbf_get_uint_by_field(mtd_area_handle, i, GOVT_CODE);
@@ -1001,8 +1002,8 @@ void init_g_area_to_govt_code_map(const std::string& dir, std::ostream& out) {
     DBFClose(mtd_area_handle);
 }
 
-void init_g_cntry_ref_map(const std::string& dir, std::ostream& out) {
-    DBFHandle cntry_ref_handle = read_dbf_file(dir + MTD_CNTRY_REF_DBF, out);
+void init_g_cntry_ref_map(const boost::filesystem::path& dir, std::ostream& out) {
+    DBFHandle cntry_ref_handle = read_dbf_file(dir / MTD_CNTRY_REF_DBF, out);
     for (int i = 0; i < DBFGetRecordCount(cntry_ref_handle); i++) {
         govt_code_type govt_code = dbf_get_uint_by_field(cntry_ref_handle, i, GOVT_CODE);
         auto unit_measure = dbf_get_string_by_field(cntry_ref_handle, i, UNTMEASURE);
@@ -1024,22 +1025,25 @@ void init_g_cntry_ref_map(const std::string& dir, std::ostream& out) {
  * \param layer Pointer to administrative layer.
  */
 
-void add_street_shape_to_osmium(OGRLayer *layer, std::string dir = std::string(), std::string sub_dir_for_testing = std::string()) {
+void add_street_shape_to_osmium(OGRLayer *layer, boost::filesystem::path dir, std::vector<boost::filesystem::path> sub_dirs, bool test = false) {
     assert(layer->GetGeomType() == wkbLineString);
     cur_layer = layer;
 
-    std::ostream& out = sub_dir_for_testing.empty() ? std::cerr : cnull;
-
+    std::ostream& out = test ? std::cerr : cnull;
+//    std::ostream& out = sub_dir_for_testing.empty() ? std::cerr : cnull;
 
 // Maps link_ids to pairs of indices and z-levels of waypoints with z-levels not equal 0.
-    z_lvl_map z_level_map = process_z_levels(read_dbf_file(dir + sub_dir_for_testing + ZLEVELS_DBF, out));
+    z_lvl_map z_level_map;
+    for (auto sub_dir : sub_dirs)
+        process_z_levels(read_dbf_file(dir / sub_dir / ZLEVELS_DBF, out), z_level_map);
 
-    if (dbf_file_exists(dir + CND_MOD_DBF) && dbf_file_exists(dir + CDMS_DBF)){
+
+    if (dbf_file_exists(dir / CND_MOD_DBF) && dbf_file_exists(dir / CDMS_DBF)){
         init_g_cnd_mod_map(dir, out);
         init_g_cdms_map(dir, out);
     }
 
-    if (dbf_file_exists(dir + MTD_AREA_DBF) && dbf_file_exists(dir + MTD_CNTRY_REF_DBF)) {
+    if (dbf_file_exists(dir / MTD_AREA_DBF) && dbf_file_exists(dir / MTD_CNTRY_REF_DBF)) {
         init_g_area_to_govt_code_map(dir, out);
         init_g_cntry_ref_map(dir, out);
     }
@@ -1066,18 +1070,24 @@ void add_street_shape_to_osmium(OGRLayer *layer, std::string dir = std::string()
     delete layer;
 }
 
+void add_street_shape_to_osmium(OGRLayer *layer, boost::filesystem::path dir, boost::filesystem::path sub_dir, bool test = false) {
+    std::vector<boost::filesystem::path> v;
+    v.push_back(sub_dir);
+    add_street_shape_to_osmium(layer, dir, v, test);
+}
+
 /**
  * \brief adds administrative boundaries to m_buffer / osmium.
  * \param layer pointer to administrative layer.
  */
 
-void add_admin_shape_to_osmium(OGRLayer *layer, std::string dir = std::string(), std::string sub_dir_for_testing = std::string()) {
+void add_admin_shape_to_osmium(OGRLayer *layer, boost::filesystem::path dir, bool test = false) {
     assert(layer->GetGeomType() == wkbPolygon);
     cur_layer = layer;
 
     if(g_mtd_area_map.empty()){
-        std::ostream& out = sub_dir_for_testing.empty() ? std::cerr : cnull;
-        process_meta_areas(read_dbf_file(dir + sub_dir_for_testing + MTD_AREA_DBF, out));
+        std::ostream& out = test ? std::cerr : cnull;
+        process_meta_areas(read_dbf_file(dir / MTD_AREA_DBF, out));
     }
 
     while ((cur_feat = cur_layer->GetNextFeature()) != NULL) {

@@ -107,7 +107,7 @@ TEST_CASE("split subway", "[split subway]") {
         std::cout << std::endl;
 
         create_testdata(test.z_lvls.c_str());
-        add_street_shape_to_osmium(read_shape_file(tmp_dir + "Streets.shp", cnull), "", tmp_dir);
+        add_street_shape_to_osmium(read_shape_file(tmp_dir + "Streets.shp", cnull), "", tmp_dir, true);
 
         std::string osm_z_lvl_string;
         std::string supposed_z_lvl;

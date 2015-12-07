@@ -13,19 +13,19 @@
 
 namespace {
 
-const std::string STREETS_SHP = "Streets.shp";
-const std::string ADMINBNDY_1_SHP = "Adminbndy1.shp";
-const std::string ADMINBNDY_2_SHP = "Adminbndy2.shp";
-const std::string ADMINBNDY_3_SHP = "Adminbndy3.shp";
-const std::string ADMINBNDY_4_SHP = "Adminbndy4.shp";
-const std::string ADMINBNDY_5_SHP = "Adminbndy5.shp";
+static const boost::filesystem::path STREETS_SHP = "Streets.shp";
+static const boost::filesystem::path ADMINBNDY_1_SHP = "Adminbndy1.shp";
+static const boost::filesystem::path ADMINBNDY_2_SHP = "Adminbndy2.shp";
+static const boost::filesystem::path ADMINBNDY_3_SHP = "Adminbndy3.shp";
+static const boost::filesystem::path ADMINBNDY_4_SHP = "Adminbndy4.shp";
+static const boost::filesystem::path ADMINBNDY_5_SHP = "Adminbndy5.shp";
 
-const std::string MTD_CNTRY_REF_DBF = "MtdCntryRef.dbf";
-const std::string MTD_AREA_DBF = "MtdArea.dbf";
-const std::string RDMS_DBF = "Rdms.dbf";
-const std::string CDMS_DBF = "Cdms.dbf";
-const std::string CND_MOD_DBF = "CndMod.dbf";
-const std::string ZLEVELS_DBF = "Zlevels.dbf";
+static const boost::filesystem::path MTD_CNTRY_REF_DBF = "MtdCntryRef.dbf";
+static const boost::filesystem::path MTD_AREA_DBF = "MtdArea.dbf";
+static const boost::filesystem::path RDMS_DBF = "Rdms.dbf";
+static const boost::filesystem::path CDMS_DBF = "Cdms.dbf";
+static const boost::filesystem::path CND_MOD_DBF = "CndMod.dbf";
+static const boost::filesystem::path ZLEVELS_DBF = "Zlevels.dbf";
 
 
 // STREETS columns

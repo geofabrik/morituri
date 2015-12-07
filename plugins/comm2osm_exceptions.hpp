@@ -23,7 +23,6 @@ struct shp_error: public osmium::io_error {
     shp_error(const char* what) :
             osmium::io_error(std::string("Could not read Shapefile: ") + what) {
     }
-
 };
 // struct shp_error
 
@@ -39,7 +38,6 @@ struct shp_empty_error: public osmium::io_error {
     shp_empty_error(const char* what) :
             osmium::io_error(std::string("Shapefile is empty: ") + what) {
     }
-
 };
 // struct shp_empty_error
 
@@ -56,7 +54,6 @@ struct dbf_error: public osmium::io_error {
     dbf_error(const char* what) :
             osmium::io_error(std::string("Could not read DBF-file: ") + what) {
     }
-
 };
 
 struct format_error: public std::runtime_error {

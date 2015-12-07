@@ -9,12 +9,16 @@
 #define BASEPLUGIN_HPP_
 
 #include <assert.h>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+
+#include <osmium/io/error.hpp>
 
 class base_plugin {
 public:
     const char* name;
-    const char* input_path;
-    const char* output_path;
+    boost::filesystem::path input_path;
+    boost::filesystem::path output_path;
 
     virtual ~base_plugin() {
     }
@@ -33,12 +37,12 @@ public:
      * \param	inputh_path_rhs	input path to set
      * \param	output_path_rhs	output path to set (may be ommited)
      * */
-    void plugin_setup(const char* input_path_rhs, const char* output_path_rhs = nullptr) {
+    void plugin_setup(boost::filesystem::path input_path_rhs, boost::filesystem::path output_path_rhs = boost::filesystem::path()) {
         input_path = input_path_rhs;
-        assert(input_path);
-        if (output_path_rhs) {
+        if(!boost::filesystem::is_directory(input_path))
+            throw(osmium::io_error("input_path '" + input_path.string() + "' is not valid."));
+        if(boost::filesystem::is_directory(output_path_rhs))
             output_path = output_path_rhs;
-        }
     }
 
     /**
@@ -61,7 +65,7 @@ public:
      *
      * \return returns true if input is existing and valid
      *  */
-    virtual bool check_input(const char* input_path, const char* output_path = nullptr) = 0;
+    virtual bool check_input(boost::filesystem::path input_path, boost::filesystem::path output_path = boost::filesystem::path("")) = 0;
 
     /**
      * \brief	Converts input to OSM files
