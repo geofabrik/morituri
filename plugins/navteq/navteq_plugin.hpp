@@ -15,9 +15,10 @@
 class navteq_plugin: public base_plugin {
 private:
     bool is_valid_format(std::string format);
-    void recurse_dir(boost::filesystem::path dir, bool recur = true);
+    void recurse_dir(boost::filesystem::path dir);
     bool check_files(boost::filesystem::path dir);
     void write_output();
+    void add_administrative_boundaries();
 
     std::vector<boost::filesystem::path> sub_dirs;
 

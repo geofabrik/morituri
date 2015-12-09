@@ -181,10 +181,10 @@ size_t build_turn_restriction(std::vector<osmium::unsigned_object_id_type> *osm_
  * \return link id of parsed feature.
  */
 
-uint64_t build_tag_list(osmium::builder::Builder* builder, osmium::memory::Buffer& buf, short z_level = -5) {
+link_id_type build_tag_list(osmium::builder::Builder* builder, osmium::memory::Buffer& buf, short z_level = -5) {
     osmium::builder::TagListBuilder tl_builder(buf, builder);
 
-    uint64_t link_id = parse_street_tags(&tl_builder, g_cur_feat, &g_cdms_map, &g_cnd_mod_map, &g_area_to_govt_code_map,
+    link_id_type link_id = parse_street_tags(&tl_builder, g_cur_feat, &g_cdms_map, &g_cnd_mod_map, &g_area_to_govt_code_map,
             &g_cntry_ref_map);
 
     if (z_level != -5 && z_level != 0) tl_builder.add_tag("layer", std::to_string(z_level).c_str());
@@ -295,7 +295,7 @@ osmium::unsigned_object_id_type build_way(OGRLineString* ogr_ls, node_map_type *
         }
         add_way_node(location, wnl_builder, map_containing_node);
     }
-    uint64_t link_id = build_tag_list(&builder, g_way_buffer, z_lvl);
+    link_id_type link_id = build_tag_list(&builder, g_way_buffer, z_lvl);
     assert(link_id != 0);
     if (g_link_id_map.find(link_id) == g_link_id_map.end())
         g_link_id_map.insert(std::make_pair(link_id, std::vector<osmium::unsigned_object_id_type>()));
@@ -596,7 +596,7 @@ void process_way(OGRLineString *ogr_ls, z_lvl_map *z_level_map) {
     middle_points_preparation(ogr_ls, node_ref_map);
     if (ogr_ls->getNumPoints() > 2) assert(node_ref_map.size() > 0);
 
-    uint64_t link_id = get_uint_from_feature(g_cur_feat, LINK_ID);
+    link_id_type link_id = get_uint_from_feature(g_cur_feat, LINK_ID);
 
     auto it = z_level_map->find(link_id);
     if (it == z_level_map->end()) {
@@ -690,7 +690,7 @@ osm_id_vector_type create_admin_boundary_ways(OGRLinearRing* ring) {
 /**
  * \brief adds navteq administrative boundary tags to Relation
  */
-void create_admin_boundary_taglist(osmium::builder::RelationBuilder& builder) {
+void build_admin_boundary_taglist(osmium::builder::RelationBuilder& builder) {
     // Mind tl_builder scope!
     osmium::builder::TagListBuilder tl_builder(g_rel_buffer, &builder);
     tl_builder.add_tag("type", "multipolygon");
@@ -719,7 +719,7 @@ void create_admin_boundary_taglist(osmium::builder::RelationBuilder& builder) {
     }
 }
 
-void create_relation_members(osmium::builder::RelationBuilder& builder, const osm_id_vector_type& ext_osm_way_ids,
+void build_relation_members(osmium::builder::RelationBuilder& builder, const osm_id_vector_type& ext_osm_way_ids,
         const osm_id_vector_type& int_osm_way_ids) {
     osmium::builder::RelationMemberListBuilder rml_builder(g_rel_buffer, &builder);
 
@@ -730,14 +730,14 @@ void create_relation_members(osmium::builder::RelationBuilder& builder, const os
         rml_builder.add_member(osmium::item_type::way, osm_id, "inner");
 }
 
-osmium::unsigned_object_id_type create_admin_boundary_relation_with_tags(osm_id_vector_type ext_osm_way_ids,
+osmium::unsigned_object_id_type build_admin_boundary_relation_with_tags(osm_id_vector_type ext_osm_way_ids,
         osm_id_vector_type int_osm_way_ids) {
     osmium::builder::RelationBuilder builder(g_rel_buffer);
     STATIC_RELATION(builder.object()).set_id(g_osm_id++);
     set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
     builder.add_user(USER);
-    create_admin_boundary_taglist(builder);
-    create_relation_members(builder, ext_osm_way_ids, int_osm_way_ids);
+    build_admin_boundary_taglist(builder);
+    build_relation_members(builder, ext_osm_way_ids, int_osm_way_ids);
     return STATIC_RELATION(builder.object()).id();
 }
 
@@ -759,7 +759,7 @@ void create_admin_boundary_multipolygon(OGRMultiPolygon* mp) {
             std::move(interior_way_ids.begin(), interior_way_ids.end(), std::back_inserter(mp_int_ring_osm_ids));
         }
     }
-    create_admin_boundary_relation_with_tags(mp_ext_ring_osm_ids, mp_int_ring_osm_ids);
+    build_admin_boundary_relation_with_tags(mp_ext_ring_osm_ids, mp_int_ring_osm_ids);
 }
 
 void create_admin_boundary_polygon(OGRPolygon* poly) {
@@ -769,13 +769,13 @@ void create_admin_boundary_polygon(OGRPolygon* poly) {
         auto tmp = create_admin_boundary_ways(poly->getInteriorRing(i));
         std::move(tmp.begin(), tmp.end(), std::back_inserter(interior_way_ids));
     }
-    create_admin_boundary_relation_with_tags(exterior_way_ids, interior_way_ids);
+    build_admin_boundary_relation_with_tags(exterior_way_ids, interior_way_ids);
 }
 
 /**
  * \brief adds administrative boundaries as Relations to m_buffer
  */
-void process_admin_boundaries() {
+void process_admin_boundary() {
     auto geom = g_cur_feat->GetGeometryRef();
     auto geom_type = geom->getGeometryType();
     if (geom_type == wkbMultiPolygon) {
@@ -802,7 +802,7 @@ void process_admin_boundaries() {
  */
 void process_meta_areas(DBFHandle handle) {
 
-    uint64_t last_link_id;
+    link_id_type last_link_id;
     for (int i = 0; i < DBFGetRecordCount(handle); i++) {
 
         osmium::unsigned_object_id_type area_id = dbf_get_uint_by_field(handle, i, AREA_ID);
@@ -849,7 +849,7 @@ std::vector<link_id_type> collect_via_manoeuvre_link_ids(link_id_type link_id, D
     return via_manoeuvre_link_id;
 }
 
-osm_id_vector_type collect_via_manoeuvre_osm_ids(const std::vector<uint64_t>& via_manoeuvre_link_id) {
+osm_id_vector_type collect_via_manoeuvre_osm_ids(const std::vector<link_id_type>& via_manoeuvre_link_id) {
     osm_id_vector_type via_manoeuvre_osm_id;
 
     osmium::Location end_point_front;
@@ -924,14 +924,14 @@ void init_cdms_map(DBFHandle cdms_handle, std::map<osmium::unsigned_object_id_ty
  * \param handle DBF file handle to navteq manoeuvres.
  * */
 
-void process_turn_restrictions(boost::filesystem::path root_dir, path_vector_type sub_dirs) {
+void add_turn_restrictions(path_vector_type sub_dirs) {
     // maps COND_ID to COND_TYPE
     std::map<osmium::unsigned_object_id_type, ushort> cdms_map;
     for (auto sub_dir : sub_dirs)
-        init_cdms_map(read_dbf_file(root_dir / sub_dir / CDMS_DBF), cdms_map);
+        init_cdms_map(read_dbf_file(sub_dir / CDMS_DBF), cdms_map);
 
     for (auto sub_dir : sub_dirs) {
-        DBFHandle rdms_handle = read_dbf_file(root_dir / sub_dir / RDMS_DBF);
+        DBFHandle rdms_handle = read_dbf_file(sub_dir / RDMS_DBF);
         for (int i = 0; i < DBFGetRecordCount(rdms_handle); i++) {
 
             link_id_type link_id = dbf_get_uint_by_field(rdms_handle, i, LINK_ID);
@@ -969,8 +969,8 @@ void init_g_cnd_mod_map(const boost::filesystem::path& dir, std::ostream& out) {
 void init_g_cdms_map(const boost::filesystem::path& dir, std::ostream& out) {
     DBFHandle cdms_handle = read_dbf_file(dir / CDMS_DBF, out);
     for (int i = 0; i < DBFGetRecordCount(cdms_handle); i++) {
-        uint64_t link_id = dbf_get_uint_by_field(cdms_handle, i, LINK_ID);
-        uint64_t cond_id = dbf_get_uint_by_field(cdms_handle, i, COND_ID);
+        link_id_type link_id = dbf_get_uint_by_field(cdms_handle, i, LINK_ID);
+        cond_id_type cond_id = dbf_get_uint_by_field(cdms_handle, i, COND_ID);
         g_cdms_map.insert(std::make_pair(link_id, cond_id));
     }
     DBFClose(cdms_handle);
@@ -999,12 +999,11 @@ void init_g_cntry_ref_map(const boost::filesystem::path& dir, std::ostream& out)
     DBFClose(cntry_ref_handle);
 }
 
-void init_street_layers(const path_vector_type& sub_dirs, bool test, const boost::filesystem::path& dir,
-        std::vector<OGRLayer*>& layer_vector) {
+void init_street_layers(const path_vector_type& sub_dirs, bool test, std::vector<OGRLayer*>& layer_vector) {
     for (auto sub_dir : sub_dirs) {
         OGRLayer* layer;
-        if (test) layer = read_shape_file(dir / sub_dir / STREETS_SHP, cnull);
-        else layer = read_shape_file(dir / sub_dir / STREETS_SHP);
+        if (test) layer = read_shape_file( sub_dir / STREETS_SHP, cnull);
+        else layer = read_shape_file( sub_dir / STREETS_SHP);
 
         layer_vector.push_back(layer);
     }
@@ -1013,11 +1012,11 @@ void init_street_layers(const path_vector_type& sub_dirs, bool test, const boost
 // \brief stores z_levels in z_level_map for later use. Maps link_ids to pairs of indices and z-levels of waypoints with z-levels not equal 0.
 void init_z_level_map(DBFHandle handle, z_lvl_map& z_level_map) {
 
-    uint64_t last_link_id;
+    link_id_type last_link_id;
     std::vector<std::pair<ushort, z_lvl_type>> v;
 
     for (int i = 0; i < DBFGetRecordCount(handle); i++) {
-        uint64_t link_id = dbf_get_uint_by_field(handle, i, LINK_ID);
+        link_id_type link_id = dbf_get_uint_by_field(handle, i, LINK_ID);
         ushort point_num = dbf_get_uint_by_field(handle, i, POINT_NUM) - 1;
         assert(point_num >= 0);
         short z_level = dbf_get_uint_by_field(handle, i, Z_LEVEL);
@@ -1057,16 +1056,16 @@ void init_country_reference(const boost::filesystem::path& sub_dir, std::ostream
  * \param layer Pointer to administrative layer.
  */
 
-void add_street_shape_to_osmium(boost::filesystem::path root_dir, path_vector_type sub_dirs, bool test = false) {
+void add_street_shapes(path_vector_type sub_dirs, bool test = false) {
 
     // read all Street layers
     std::vector<OGRLayer*> layer_vector;
-    init_street_layers(sub_dirs, test, root_dir, layer_vector);
+    init_street_layers(sub_dirs, test, layer_vector);
 
     std::cout << " processing z-levels" << std::endl;
     z_lvl_map z_level_map;
     for (int i = 0; i<layer_vector.size(); i++){
-        boost::filesystem::path sub_dir = root_dir / sub_dirs.at(i);
+        boost::filesystem::path sub_dir = sub_dirs.at(i);
         OGRLayer* layer = layer_vector.at(i);
         assert(layer->GetGeomType() == wkbLineString);
         g_cur_layer = layer;
@@ -1084,7 +1083,7 @@ void add_street_shape_to_osmium(boost::filesystem::path root_dir, path_vector_ty
         g_cur_layer = layer;
         // get all nodes which may be a routable crossing
         while ((g_cur_feat = g_cur_layer->GetNextFeature()) != NULL){
-            uint64_t link_id = get_uint_from_feature(g_cur_feat, LINK_ID);
+            link_id_type link_id = get_uint_from_feature(g_cur_feat, LINK_ID);
             // omit way end nodes with different z-levels (they have to be handled extra)
             if (z_level_map.find(link_id) == z_level_map.end())
                 process_way_end_nodes(static_cast<OGRLineString*>(g_cur_feat->GetGeometryRef()));
@@ -1111,10 +1110,10 @@ void add_street_shape_to_osmium(boost::filesystem::path root_dir, path_vector_ty
     z_level_map.clear();
 }
 
-void add_street_shape_to_osmium(boost::filesystem::path dir, boost::filesystem::path sub_dir, bool test = false) {
-    std::vector<boost::filesystem::path> v;
-    v.push_back(sub_dir);
-    add_street_shape_to_osmium(dir, v, test);
+void add_street_shapes(boost::filesystem::path dir, boost::filesystem::path sub_dir, bool test = false) {
+    std::vector<boost::filesystem::path> sub_dir_vector;
+    sub_dir_vector.push_back(sub_dir);
+    add_street_shapes(sub_dir_vector, test);
 }
 
 /**
@@ -1122,17 +1121,14 @@ void add_street_shape_to_osmium(boost::filesystem::path dir, boost::filesystem::
  * \param layer pointer to administrative layer.
  */
 
-void add_admin_shape_to_osmium(OGRLayer *layer, boost::filesystem::path dir, bool test = false) {
+void add_admin_shape(boost::filesystem::path admin_shape_file, bool test = false) {
+
+    OGRLayer *layer = read_shape_file(admin_shape_file);
     assert(layer->GetGeomType() == wkbPolygon);
     g_cur_layer = layer;
 
-    if(g_mtd_area_map.empty()){
-        std::ostream& out = test ? std::cerr : cnull;
-        process_meta_areas(read_dbf_file(dir / MTD_AREA_DBF, out));
-    }
-
     while ((g_cur_feat = g_cur_layer->GetNextFeature()) != NULL) {
-        process_admin_boundaries();
+        process_admin_boundary();
         delete g_cur_feat;
     }
 

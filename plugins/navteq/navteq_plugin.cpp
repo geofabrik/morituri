@@ -60,12 +60,12 @@ bool navteq_plugin::check_files(boost::filesystem::path dir) {
  * \return Existance of valid data in a subdirectory.
  */
 
-void navteq_plugin::recurse_dir(boost::filesystem::path dir, bool recur) {
-    if (check_files(dir)) sub_dirs.push_back(dir.filename());
+void navteq_plugin::recurse_dir(boost::filesystem::path dir) {
+    if (check_files(dir)) sub_dirs.push_back(dir/*.filename()*/);
 
     for (auto& itr : boost::make_iterator_range(boost::filesystem::directory_iterator(dir), { })) {
-        if (boost::filesystem::is_directory(itr) && recur){
-            recurse_dir(itr, false);
+        if (boost::filesystem::is_directory(itr)){
+            recurse_dir(itr);
         }
     }
 }
@@ -106,32 +106,33 @@ void navteq_plugin::write_output() {
     writer.close();
 }
 
+void navteq_plugin::add_administrative_boundaries() {
+    // todo admin-levels only apply to the US => more generic for all countries
+    for (auto sub_dir : sub_dirs){
+        process_meta_areas(read_dbf_file(sub_dir / MTD_AREA_DBF));
+    }
+
+    for (auto sub_dir : sub_dirs) {
+        if (shp_file_exists(sub_dir / ADMINBNDY_1_SHP)) add_admin_shape(sub_dir / ADMINBNDY_1_SHP);
+        if (shp_file_exists(sub_dir / ADMINBNDY_2_SHP)) add_admin_shape(sub_dir / ADMINBNDY_2_SHP);
+        if (shp_file_exists(sub_dir / ADMINBNDY_3_SHP)) add_admin_shape(sub_dir / ADMINBNDY_3_SHP);
+        if (shp_file_exists(sub_dir / ADMINBNDY_4_SHP)) add_admin_shape(sub_dir / ADMINBNDY_4_SHP);
+        if (shp_file_exists(sub_dir / ADMINBNDY_5_SHP)) add_admin_shape(sub_dir / ADMINBNDY_5_SHP);
+    }
+    g_mtd_area_map.clear();
+}
+
 void navteq_plugin::execute() {
 
-    add_street_shape_to_osmium(input_path, sub_dirs);
+    add_street_shapes(sub_dirs);
     assert__id_uniqueness();
 
-    process_turn_restrictions(input_path, sub_dirs);
+    add_turn_restrictions(sub_dirs);
     assert__id_uniqueness();
-//
-////    assert__node_locations_uniqueness();
-//
-//// todo admin-levels only apply to the US => more generic for all countries
-//    if (shp_file_exists(input_path / ADMINBNDY_1_SHP))
-//        add_admin_shape_to_osmium(read_shape_file(input_path / ADMINBNDY_1_SHP), input_path);
-//    if (shp_file_exists(input_path / ADMINBNDY_2_SHP))
-//        add_admin_shape_to_osmium(read_shape_file(input_path / ADMINBNDY_2_SHP), input_path);
-//    if (shp_file_exists(input_path / ADMINBNDY_3_SHP))
-//        add_admin_shape_to_osmium(read_shape_file(input_path / ADMINBNDY_3_SHP), input_path);
-//    if (shp_file_exists(input_path / ADMINBNDY_4_SHP))
-//        add_admin_shape_to_osmium(read_shape_file(input_path / ADMINBNDY_4_SHP), input_path);
-//    if (shp_file_exists(input_path / ADMINBNDY_5_SHP))
-//        add_admin_shape_to_osmium(read_shape_file(input_path / ADMINBNDY_5_SHP), input_path);
-//    g_mtd_area_map.clear();
 
-    if (!output_path.empty()) {
-        write_output();
-    }
+    add_administrative_boundaries();
+
+    if (!output_path.empty()) write_output();
 
     std::cout << std::endl << "fin" << std::endl;
 }
