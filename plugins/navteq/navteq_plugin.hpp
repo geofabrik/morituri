@@ -17,6 +17,8 @@ private:
     bool is_valid_format(std::string format);
     void recurse_dir(boost::filesystem::path dir, bool recur = true);
     bool check_files(boost::filesystem::path dir);
+    void write_output();
+
     std::vector<boost::filesystem::path> sub_dirs;
 
 public:

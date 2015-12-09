@@ -13,7 +13,7 @@
 #include "plugins/navteq/navteq_plugin.hpp"
 #include "plugins/dummy/dummy_plugin.hpp"
 
-std::string input_path, output_path;
+boost::filesystem::path input_path, output_file;
 
 void print_help() {
     std::cout << "comm2osm [OPTIONS] [INFILE [OUTFILE]]\n\n"
@@ -54,10 +54,10 @@ void check_args_and_setup(int argc, char* argv[]) {
         std::cerr << "Usage: " << argv[0] << " [OPTIONS] [INFILE [OUTFILE]]" << std::endl;
         exit(1);
     } else if (remaining_args == 2) {
-        input_path = argv[optind];
-        output_path = argv[optind + 1];
+        input_path = boost::filesystem::path(argv[optind]);
+        output_file = boost::filesystem::path(argv[optind + 1]);
     } else if (remaining_args == 1) {
-        input_path = argv[optind];
+        input_path = boost::filesystem::path(argv[optind]);
     }
 }
 
@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
     plugins.push_back(new navteq_plugin());
 
     for (auto plugin : plugins) {
-        if (plugin->check_input(input_path.c_str(), output_path.c_str())) {
+        if (plugin->check_input(input_path, output_file)) {
             std::cout << "executing plugin " << plugin->get_name() << std::endl;
             plugin->execute();
         }

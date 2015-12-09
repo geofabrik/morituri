@@ -41,7 +41,7 @@ public:
         input_path = input_path_rhs;
         if(!boost::filesystem::is_directory(input_path))
             throw(osmium::io_error("input_path '" + input_path.string() + "' is not valid."));
-        if(boost::filesystem::is_directory(output_path_rhs))
+        if(boost::filesystem::is_directory(output_path_rhs.parent_path()))
             output_path = output_path_rhs;
     }
 

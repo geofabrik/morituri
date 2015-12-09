@@ -76,10 +76,10 @@ std::map<area_id_type, govt_code_type> g_area_to_govt_code_map;
 cntry_ref_map_type g_cntry_ref_map;
 
 // current layer
-OGRLayer* cur_layer;
+OGRLayer* g_cur_layer;
 
 // current feature
-OGRFeature* cur_feat;
+OGRFeature* g_cur_feat;
 
 /**
  * \brief Dummy attributes enable josm to read output xml files.
@@ -148,7 +148,7 @@ void add_common_node_as_via(std::vector<osmium::unsigned_object_id_type>* osm_id
  * \param osm_ids vector with osm_ids of ways which belong to the turn restriction
  * \return Last number of committed bytes to m_buffer before this commit.
  */
-size_t write_turn_restriction(std::vector<osmium::unsigned_object_id_type> *osm_ids) {
+size_t build_turn_restriction(std::vector<osmium::unsigned_object_id_type> *osm_ids) {
 
     osmium::builder::RelationBuilder builder(g_rel_buffer);
     STATIC_RELATION(builder.object()).set_id(std::to_string(g_osm_id++).c_str());
@@ -184,7 +184,7 @@ size_t write_turn_restriction(std::vector<osmium::unsigned_object_id_type> *osm_
 uint64_t build_tag_list(osmium::builder::Builder* builder, osmium::memory::Buffer& buf, short z_level = -5) {
     osmium::builder::TagListBuilder tl_builder(buf, builder);
 
-    uint64_t link_id = parse_street_tags(&tl_builder, cur_feat, &g_cdms_map, &g_cnd_mod_map, &g_area_to_govt_code_map,
+    uint64_t link_id = parse_street_tags(&tl_builder, g_cur_feat, &g_cdms_map, &g_cnd_mod_map, &g_area_to_govt_code_map,
             &g_cntry_ref_map);
 
     if (z_level != -5 && z_level != 0) tl_builder.add_tag("layer", std::to_string(z_level).c_str());
@@ -533,7 +533,7 @@ void set_ferry_z_lvls_to_zero(std::vector<std::pair<ushort, z_lvl_type> >& z_lvl
     // erase first z_lvl if first index references first node
     if (z_lvl_vec.size() > 0 && z_lvl_vec.begin()->first != 0) z_lvl_vec.erase(z_lvl_vec.begin());
     // erase last z_lvl if last index references last node
-    OGRLineString* ogr_ls = static_cast<OGRLineString*>(cur_feat->GetGeometryRef());
+    OGRLineString* ogr_ls = static_cast<OGRLineString*>(g_cur_feat->GetGeometryRef());
     if (z_lvl_vec.size() > 0 && (z_lvl_vec.end() - 1)->first != ogr_ls->getNumPoints() - 1)
         z_lvl_vec.erase(z_lvl_vec.end());
 }
@@ -543,10 +543,10 @@ void create_house_numbers(OGRLineString* ogr_ls, bool left){
     const char* nref_addr = left ? L_NREFADDR : R_NREFADDR;
     const char* addr_schema = left ? L_ADDRSCH : R_ADDRSCH;
 
-    if (!strcmp(get_field_from_feature(cur_feat, ref_addr),"")) return;
-    if (!strcmp(get_field_from_feature(cur_feat, nref_addr),"")) return;
-    if (!strcmp(get_field_from_feature(cur_feat, addr_schema),"")) return;
-    if (!strcmp(get_field_from_feature(cur_feat, addr_schema),"M")) return;
+    if (!strcmp(get_field_from_feature(g_cur_feat, ref_addr),"")) return;
+    if (!strcmp(get_field_from_feature(g_cur_feat, nref_addr),"")) return;
+    if (!strcmp(get_field_from_feature(g_cur_feat, addr_schema),"")) return;
+    if (!strcmp(get_field_from_feature(g_cur_feat, addr_schema),"M")) return;
 
     OGRLineString* offset_ogr_ls = create_offset_curve(ogr_ls, 0.00005, left);
 
@@ -560,9 +560,9 @@ void create_house_numbers(OGRLineString* ogr_ls, bool left){
         assert(location.valid());
         osmium::unsigned_object_id_type node_id;
         if (i == 0) {
-            node_id = build_node_with_tag(location, "addr:housenumber", get_field_from_feature(cur_feat, ref_addr));
+            node_id = build_node_with_tag(location, "addr:housenumber", get_field_from_feature(g_cur_feat, ref_addr));
         } else if (i == offset_ogr_ls->getNumPoints() - 1) {
-            node_id = build_node_with_tag(location, "addr:housenumber", get_field_from_feature(cur_feat, nref_addr));
+            node_id = build_node_with_tag(location, "addr:housenumber", get_field_from_feature(g_cur_feat, nref_addr));
         } else {
             node_id = build_node(location);
         }
@@ -571,7 +571,7 @@ void create_house_numbers(OGRLineString* ogr_ls, bool left){
     }
     {
         osmium::builder::TagListBuilder tl_builder(g_way_buffer, &way_builder);
-        const char* schema = parse_house_number_schema(get_field_from_feature(cur_feat, addr_schema));
+        const char* schema = parse_house_number_schema(get_field_from_feature(g_cur_feat, addr_schema));
         tl_builder.add_tag("addr:interpolation", schema);
     }
     g_node_buffer.commit();
@@ -596,7 +596,7 @@ void process_way(OGRLineString *ogr_ls, z_lvl_map *z_level_map) {
     middle_points_preparation(ogr_ls, node_ref_map);
     if (ogr_ls->getNumPoints() > 2) assert(node_ref_map.size() > 0);
 
-    uint64_t link_id = get_uint_from_feature(cur_feat, LINK_ID);
+    uint64_t link_id = get_uint_from_feature(g_cur_feat, LINK_ID);
 
     auto it = z_level_map->find(link_id);
     if (it == z_level_map->end()) {
@@ -620,13 +620,13 @@ void process_way(OGRLineString *ogr_ls, z_lvl_map *z_level_map) {
 
         g_way_buffer.commit();
 
-        bool ferry = is_ferry(get_field_from_feature(cur_feat, FERRY));
+        bool ferry = is_ferry(get_field_from_feature(g_cur_feat, FERRY));
         if (ferry) set_ferry_z_lvls_to_zero(it->second);
 
         split_way_by_z_level(ogr_ls, &it->second, &node_ref_map, link_id);
     }
 
-    if (!strcmp(get_field_from_feature(cur_feat, ADDR_TYPE),"B")){
+    if (!strcmp(get_field_from_feature(g_cur_feat, ADDR_TYPE),"B")){
         create_house_numbers(ogr_ls);
     }
 }
@@ -641,29 +641,6 @@ void process_way_end_nodes(OGRLineString *ogr_ls) {
     process_way_end_node(osmium::Location(ogr_ls->getX(0), ogr_ls->getY(0)));
     process_way_end_node(
             osmium::Location(ogr_ls->getX(ogr_ls->getNumPoints() - 1), ogr_ls->getY(ogr_ls->getNumPoints() - 1)));
-}
-
-// \brief stores z_levels in z_level_map for later use
-z_lvl_map process_z_levels(DBFHandle handle, z_lvl_map& z_level_map) {
-
-    uint64_t last_link_id;
-    std::vector<std::pair<ushort, z_lvl_type>> v;
-
-    for (int i = 0; i < DBFGetRecordCount(handle); i++) {
-        uint64_t link_id = dbf_get_uint_by_field(handle, i, LINK_ID);
-        ushort point_num = dbf_get_uint_by_field(handle, i, POINT_NUM) - 1;
-        assert(point_num >= 0);
-        short z_level = dbf_get_uint_by_field(handle, i, Z_LEVEL);
-
-        if (i > 0 && last_link_id != link_id && v.size() > 0) {
-            z_level_map.insert(std::make_pair(last_link_id, v));
-            v = std::vector<std::pair<ushort, z_lvl_type>>();
-        }
-        if (z_level != 0) v.push_back(std::make_pair(point_num, z_level));
-        last_link_id = link_id;
-    }
-    if (v.size() > 0) z_level_map.insert(std::make_pair(last_link_id, v));
-    return z_level_map;
 }
 
 /**
@@ -718,10 +695,10 @@ void create_admin_boundary_taglist(osmium::builder::RelationBuilder& builder) {
     osmium::builder::TagListBuilder tl_builder(g_rel_buffer, &builder);
     tl_builder.add_tag("type", "multipolygon");
     tl_builder.add_tag("boundary", "administrative");
-    for (int i = 0; i < cur_layer->GetLayerDefn()->GetFieldCount(); i++) {
-        OGRFieldDefn* po_field_defn = cur_layer->GetLayerDefn()->GetFieldDefn(i);
+    for (int i = 0; i < g_cur_layer->GetLayerDefn()->GetFieldCount(); i++) {
+        OGRFieldDefn* po_field_defn = g_cur_layer->GetLayerDefn()->GetFieldDefn(i);
         const char* field_name = po_field_defn->GetNameRef();
-        const char* field_value = cur_feat->GetFieldAsString(i);
+        const char* field_value = g_cur_feat->GetFieldAsString(i);
         // admin boundary mapping: see NAVSTREETS Street Data Reference Manual: p.947)
         if (!strcmp(field_name, "AREA_ID")) {
             osmium::unsigned_object_id_type area_id = std::stoi(field_value);
@@ -799,7 +776,7 @@ void create_admin_boundary_polygon(OGRPolygon* poly) {
  * \brief adds administrative boundaries as Relations to m_buffer
  */
 void process_admin_boundaries() {
-    auto geom = cur_feat->GetGeometryRef();
+    auto geom = g_cur_feat->GetGeometryRef();
     auto geom_type = geom->getGeometryType();
     if (geom_type == wkbMultiPolygon) {
         create_admin_boundary_multipolygon(static_cast<OGRMultiPolygon*>(geom));
@@ -853,16 +830,16 @@ void process_meta_areas(DBFHandle handle) {
     DBFClose(handle);
 }
 
-std::vector<uint64_t> collect_via_manoeuvre_link_ids(uint64_t link_id, DBFHandle rdms_handle,
-        osmium::unsigned_object_id_type cond_id, int& i) {
-    std::vector<uint64_t> via_manoeuvre_link_id;
+std::vector<link_id_type> collect_via_manoeuvre_link_ids(link_id_type link_id, DBFHandle rdms_handle,
+        cond_id_type cond_id, int& i) {
+    std::vector<link_id_type> via_manoeuvre_link_id;
     via_manoeuvre_link_id.push_back(link_id);
     for (int j = 0;; j++) {
         if (i + j == DBFGetRecordCount(rdms_handle)) {
             i += j - 1;
             break;
         }
-        osmium::unsigned_object_id_type next_cond_id = dbf_get_uint_by_field(rdms_handle, i + j, COND_ID);
+        cond_id_type next_cond_id = dbf_get_uint_by_field(rdms_handle, i + j, COND_ID);
         if (cond_id != next_cond_id) {
             i += j - 1;
             break;
@@ -872,9 +849,8 @@ std::vector<uint64_t> collect_via_manoeuvre_link_ids(uint64_t link_id, DBFHandle
     return via_manoeuvre_link_id;
 }
 
-std::vector<osmium::unsigned_object_id_type> collect_via_manoeuvre_osm_ids(
-        const std::vector<uint64_t>& via_manoeuvre_link_id) {
-    std::vector<osmium::unsigned_object_id_type> via_manoeuvre_osm_id;
+osm_id_vector_type collect_via_manoeuvre_osm_ids(const std::vector<uint64_t>& via_manoeuvre_link_id) {
+    osm_id_vector_type via_manoeuvre_osm_id;
 
     osmium::Location end_point_front;
     osmium::Location end_point_back;
@@ -884,7 +860,7 @@ std::vector<osmium::unsigned_object_id_type> collect_via_manoeuvre_osm_ids(
     for (auto it : via_manoeuvre_link_id) {
         bool reverse = false;
 
-        if (g_link_id_map.find(it) == g_link_id_map.end()) return std::vector<osmium::unsigned_object_id_type>();
+        if (g_link_id_map.find(it) == g_link_id_map.end()) return osm_id_vector_type();
 
         osm_id_vector_type &osm_id_vector = g_link_id_map.at(it);
         auto first_osm_id = osm_id_vector.at(0);
@@ -935,38 +911,46 @@ std::vector<osmium::unsigned_object_id_type> collect_via_manoeuvre_osm_ids(
     return via_manoeuvre_osm_id;
 }
 
-/**
- * \brief reads turn restrictions from DBF file and writes them to osmium.
- * \param handle DBF file handle to navteq manoeuvres.
- * */
-
-void process_turn_restrictions(DBFHandle rdms_handle, DBFHandle cdms_handle) {
-    // maps COND_ID to COND_TYPE
-    std::map<osmium::unsigned_object_id_type, ushort> cdms_map;
+void init_cdms_map(DBFHandle cdms_handle, std::map<osmium::unsigned_object_id_type, ushort>& cdms_map) {
     for (int i = 0; i < DBFGetRecordCount(cdms_handle); i++) {
         osmium::unsigned_object_id_type cond_id = dbf_get_uint_by_field(cdms_handle, i, COND_ID);
         ushort cond_type = dbf_get_uint_by_field(cdms_handle, i, COND_TYPE);
         cdms_map.insert(std::make_pair(cond_id, cond_type));
     }
+}
 
-    for (int i = 0; i < DBFGetRecordCount(rdms_handle); i++) {
+/**
+ * \brief reads turn restrictions from DBF file and writes them to osmium.
+ * \param handle DBF file handle to navteq manoeuvres.
+ * */
 
-        uint64_t link_id = dbf_get_uint_by_field(rdms_handle, i, LINK_ID);
-        osmium::unsigned_object_id_type cond_id = dbf_get_uint_by_field(rdms_handle, i, COND_ID);
+void process_turn_restrictions(boost::filesystem::path root_dir, path_vector_type sub_dirs) {
+    // maps COND_ID to COND_TYPE
+    std::map<osmium::unsigned_object_id_type, ushort> cdms_map;
+    for (auto sub_dir : sub_dirs)
+        init_cdms_map(read_dbf_file(root_dir / sub_dir / CDMS_DBF), cdms_map);
 
-        auto it = cdms_map.find(cond_id);
-        if (it != cdms_map.end() && it->second != RESTRICTED_DRIVING_MANOEUVRE) continue;
+    for (auto sub_dir : sub_dirs) {
+        DBFHandle rdms_handle = read_dbf_file(root_dir / sub_dir / RDMS_DBF);
+        for (int i = 0; i < DBFGetRecordCount(rdms_handle); i++) {
 
-        std::vector<uint64_t> via_manoeuvre_link_id = collect_via_manoeuvre_link_ids(link_id, rdms_handle, cond_id, i);
+            link_id_type link_id = dbf_get_uint_by_field(rdms_handle, i, LINK_ID);
+            cond_id_type cond_id = dbf_get_uint_by_field(rdms_handle, i, COND_ID);
 
-        std::vector<osmium::unsigned_object_id_type> via_manoeuvre_osm_id = collect_via_manoeuvre_osm_ids(
-                via_manoeuvre_link_id);
+            auto it = cdms_map.find(cond_id);
+            if (it != cdms_map.end() && it->second != RESTRICTED_DRIVING_MANOEUVRE) continue;
 
-        // only process complete turn relations
-        if (via_manoeuvre_osm_id.empty()) continue;
+            link_id_vector_type via_manoeuvre_link_id = collect_via_manoeuvre_link_ids(link_id, rdms_handle, cond_id,
+                    i);
 
-        // todo find out which direction turn restriction has and apply. For now: always apply 'no_straight_on'
-        write_turn_restriction (&via_manoeuvre_osm_id);
+            osm_id_vector_type via_manoeuvre_osm_id = collect_via_manoeuvre_osm_ids(via_manoeuvre_link_id);
+
+            // only process complete turn relations
+            if (via_manoeuvre_osm_id.empty()) continue;
+
+            // todo find out which direction turn restriction has and apply. For now: always apply 'no_straight_on'
+            build_turn_restriction(&via_manoeuvre_osm_id);
+        }
     }
 }
 
@@ -1015,6 +999,54 @@ void init_g_cntry_ref_map(const boost::filesystem::path& dir, std::ostream& out)
     DBFClose(cntry_ref_handle);
 }
 
+void init_street_layers(const path_vector_type& sub_dirs, bool test, const boost::filesystem::path& dir,
+        std::vector<OGRLayer*>& layer_vector) {
+    for (auto sub_dir : sub_dirs) {
+        OGRLayer* layer;
+        if (test) layer = read_shape_file(dir / sub_dir / STREETS_SHP, cnull);
+        else layer = read_shape_file(dir / sub_dir / STREETS_SHP);
+
+        layer_vector.push_back(layer);
+    }
+}
+
+// \brief stores z_levels in z_level_map for later use. Maps link_ids to pairs of indices and z-levels of waypoints with z-levels not equal 0.
+void init_z_level_map(DBFHandle handle, z_lvl_map& z_level_map) {
+
+    uint64_t last_link_id;
+    std::vector<std::pair<ushort, z_lvl_type>> v;
+
+    for (int i = 0; i < DBFGetRecordCount(handle); i++) {
+        uint64_t link_id = dbf_get_uint_by_field(handle, i, LINK_ID);
+        ushort point_num = dbf_get_uint_by_field(handle, i, POINT_NUM) - 1;
+        assert(point_num >= 0);
+        short z_level = dbf_get_uint_by_field(handle, i, Z_LEVEL);
+
+        if (i > 0 && last_link_id != link_id && v.size() > 0) {
+            z_level_map.insert(std::make_pair(last_link_id, v));
+            v = std::vector<std::pair<ushort, z_lvl_type>>();
+        }
+        if (z_level != 0) v.push_back(std::make_pair(point_num, z_level));
+        last_link_id = link_id;
+    }
+
+    if (!v.empty()) z_level_map.insert(std::make_pair(last_link_id, v));
+}
+
+void init_conditional_driving_manoeuvres(const boost::filesystem::path& sub_dir, std::ostream& out) {
+    if (dbf_file_exists(sub_dir / CND_MOD_DBF) && dbf_file_exists(sub_dir / CDMS_DBF)) {
+        init_g_cnd_mod_map(sub_dir, out);
+        init_g_cdms_map(sub_dir, out);
+    }
+}
+
+void init_country_reference(const boost::filesystem::path& sub_dir, std::ostream& out) {
+    if (dbf_file_exists(sub_dir / MTD_AREA_DBF) && dbf_file_exists(sub_dir / MTD_CNTRY_REF_DBF)) {
+        init_g_area_to_govt_code_map(sub_dir, out);
+        init_g_cntry_ref_map(sub_dir, out);
+    }
+}
+
 /****************************************************
  * adds layers to osmium:
  *      cur_layer and cur_feature have to be set
@@ -1025,55 +1057,64 @@ void init_g_cntry_ref_map(const boost::filesystem::path& dir, std::ostream& out)
  * \param layer Pointer to administrative layer.
  */
 
-void add_street_shape_to_osmium(OGRLayer *layer, boost::filesystem::path dir, std::vector<boost::filesystem::path> sub_dirs, bool test = false) {
-    assert(layer->GetGeomType() == wkbLineString);
-    cur_layer = layer;
+void add_street_shape_to_osmium(boost::filesystem::path root_dir, path_vector_type sub_dirs, bool test = false) {
 
-    std::ostream& out = test ? std::cerr : cnull;
-//    std::ostream& out = sub_dir_for_testing.empty() ? std::cerr : cnull;
+    // read all Street layers
+    std::vector<OGRLayer*> layer_vector;
+    init_street_layers(sub_dirs, test, root_dir, layer_vector);
 
-// Maps link_ids to pairs of indices and z-levels of waypoints with z-levels not equal 0.
+    std::cout << " processing z-levels" << std::endl;
     z_lvl_map z_level_map;
-    for (auto sub_dir : sub_dirs)
-        process_z_levels(read_dbf_file(dir / sub_dir / ZLEVELS_DBF, out), z_level_map);
+    for (int i = 0; i<layer_vector.size(); i++){
+        boost::filesystem::path sub_dir = root_dir / sub_dirs.at(i);
+        OGRLayer* layer = layer_vector.at(i);
+        assert(layer->GetGeomType() == wkbLineString);
+        g_cur_layer = layer;
 
+        std::ostream& out = test ? std::cerr : cnull;
 
-    if (dbf_file_exists(dir / CND_MOD_DBF) && dbf_file_exists(dir / CDMS_DBF)){
-        init_g_cnd_mod_map(dir, out);
-        init_g_cdms_map(dir, out);
+        init_z_level_map(read_dbf_file(sub_dir / ZLEVELS_DBF, out), z_level_map);
+        init_conditional_driving_manoeuvres(sub_dir, out);
+        init_country_reference(sub_dir, out);
     }
 
-    if (dbf_file_exists(dir / MTD_AREA_DBF) && dbf_file_exists(dir / MTD_CNTRY_REF_DBF)) {
-        init_g_area_to_govt_code_map(dir, out);
-        init_g_cntry_ref_map(dir, out);
+    std::cout << " processing way end points" << std::endl;
+    for (int i = 0; i<layer_vector.size(); i++){
+        OGRLayer* layer = layer_vector.at(i);
+        g_cur_layer = layer;
+        // get all nodes which may be a routable crossing
+        while ((g_cur_feat = g_cur_layer->GetNextFeature()) != NULL){
+            uint64_t link_id = get_uint_from_feature(g_cur_feat, LINK_ID);
+            // omit way end nodes with different z-levels (they have to be handled extra)
+            if (z_level_map.find(link_id) == z_level_map.end())
+                process_way_end_nodes(static_cast<OGRLineString*>(g_cur_feat->GetGeometryRef()));
+            delete g_cur_feat;
+        }
+        g_node_buffer.commit();
+        g_way_buffer.commit();
+        g_cur_layer->ResetReading();
     }
-
-// get all nodes which may be a routable crossing
-    while ((cur_feat = cur_layer->GetNextFeature()) != NULL){
-        uint64_t link_id = get_uint_from_feature(cur_feat, LINK_ID);
-        // omit way end nodes with different z-levels (they have to be handled extra)
-        if (z_level_map.find(link_id) == z_level_map.end())
-            process_way_end_nodes(static_cast<OGRLineString*>(cur_feat->GetGeometryRef()));
-        delete cur_feat;
+    std::cout << " processing ways" << std::endl;
+    for (int i = 0; i<layer_vector.size(); i++){
+        OGRLayer* layer = layer_vector.at(i);
+        g_cur_layer = layer;
+        while ((g_cur_feat = g_cur_layer->GetNextFeature()) != NULL){
+            process_way(static_cast<OGRLineString*>(g_cur_feat->GetGeometryRef()), &z_level_map);
+            delete g_cur_feat;
+        }
     }
-    g_node_buffer.commit();
-    g_way_buffer.commit();
-
-    cur_layer->ResetReading();
-    while ((cur_feat = cur_layer->GetNextFeature()) != NULL){
-        process_way(static_cast<OGRLineString*>(cur_feat->GetGeometryRef()), &z_level_map);
-        delete cur_feat;
-    }
+    std::cout << " clean" << std::endl;
+    for (OGRLayer* layer : layer_vector)
+        delete layer;
     for (auto elem : z_level_map)
         elem.second.clear();
     z_level_map.clear();
-    delete layer;
 }
 
-void add_street_shape_to_osmium(OGRLayer *layer, boost::filesystem::path dir, boost::filesystem::path sub_dir, bool test = false) {
+void add_street_shape_to_osmium(boost::filesystem::path dir, boost::filesystem::path sub_dir, bool test = false) {
     std::vector<boost::filesystem::path> v;
     v.push_back(sub_dir);
-    add_street_shape_to_osmium(layer, dir, v, test);
+    add_street_shape_to_osmium(dir, v, test);
 }
 
 /**
@@ -1083,16 +1124,16 @@ void add_street_shape_to_osmium(OGRLayer *layer, boost::filesystem::path dir, bo
 
 void add_admin_shape_to_osmium(OGRLayer *layer, boost::filesystem::path dir, bool test = false) {
     assert(layer->GetGeomType() == wkbPolygon);
-    cur_layer = layer;
+    g_cur_layer = layer;
 
     if(g_mtd_area_map.empty()){
         std::ostream& out = test ? std::cerr : cnull;
         process_meta_areas(read_dbf_file(dir / MTD_AREA_DBF, out));
     }
 
-    while ((cur_feat = cur_layer->GetNextFeature()) != NULL) {
+    while ((g_cur_feat = g_cur_layer->GetNextFeature()) != NULL) {
         process_admin_boundaries();
-        delete cur_feat;
+        delete g_cur_feat;
     }
 
     delete layer;

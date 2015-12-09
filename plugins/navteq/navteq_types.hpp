@@ -12,7 +12,9 @@
 #include <osmium/index/map/sparse_mem_array.hpp>
 #include <osmium/osm/location.hpp>
 #include <osmium/osm/types.hpp>
+#include <boost/filesystem/path.hpp>
 
+typedef std::vector<boost::filesystem::path> path_vector_type;
 
 typedef uint64_t cond_id_type;
 typedef uint64_t mod_typ_type;
@@ -75,8 +77,9 @@ typedef std::pair<osmium::Location, osmium::unsigned_object_id_type> loc_osmid_p
 typedef std::vector<loc_osmid_pair_type> node_vector_type;
 
 // maps link ids to a vector of osm_ids
-typedef std::map<uint64_t, osm_id_vector_type> link_id_map_type;
+typedef std::map<link_id_type, osm_id_vector_type> link_id_map_type;
 
+typedef std::vector<link_id_type> link_id_vector_type;
 
 /* z-level types */
 // type of z-levels (range -4 to +5)
