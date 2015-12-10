@@ -690,13 +690,13 @@ osm_id_vector_type build_admin_boundary_ways(OGRLinearRing* ring) {
 /**
  * \brief adds navteq administrative boundary tags to Relation
  */
-void build_admin_boundary_taglist(osmium::builder::RelationBuilder& builder) {
+void build_admin_boundary_taglist(osmium::builder::RelationBuilder& builder, ogr_layer_uptr& layer) {
     // Mind tl_builder scope!
     osmium::builder::TagListBuilder tl_builder(g_rel_buffer, &builder);
     tl_builder.add_tag("type", "multipolygon");
     tl_builder.add_tag("boundary", "administrative");
-    for (int i = 0; i < g_cur_layer->GetLayerDefn()->GetFieldCount(); i++) {
-        OGRFieldDefn* po_field_defn = g_cur_layer->GetLayerDefn()->GetFieldDefn(i);
+    for (int i = 0; i < layer->GetLayerDefn()->GetFieldCount(); i++) {
+        OGRFieldDefn* po_field_defn = layer->GetLayerDefn()->GetFieldDefn(i);
         const char* field_name = po_field_defn->GetNameRef();
         const char* field_value = g_cur_feat->GetFieldAsString(i);
         // admin boundary mapping: see NAVSTREETS Street Data Reference Manual: p.947)
@@ -731,12 +731,12 @@ void build_relation_members(osmium::builder::RelationBuilder& builder, const osm
 }
 
 osmium::unsigned_object_id_type build_admin_boundary_relation_with_tags(osm_id_vector_type ext_osm_way_ids,
-        osm_id_vector_type int_osm_way_ids) {
+        osm_id_vector_type int_osm_way_ids, ogr_layer_uptr& layer) {
     osmium::builder::RelationBuilder builder(g_rel_buffer);
     STATIC_RELATION(builder.object()).set_id(g_osm_id++);
     set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
     builder.add_user(USER);
-    build_admin_boundary_taglist(builder);
+    build_admin_boundary_taglist(builder, layer);
     build_relation_members(builder, ext_osm_way_ids, int_osm_way_ids);
     return STATIC_RELATION(builder.object()).id();
 }
@@ -774,7 +774,7 @@ void create_admin_boundary_member(OGRPolygon* poly, osm_id_vector_type& exterior
 /**
  * \brief adds administrative boundaries as Relations to m_buffer
  */
-void process_admin_boundary() {
+void process_admin_boundary(ogr_layer_uptr& layer) {
     auto geom = g_cur_feat->GetGeometryRef();
     auto geom_type = geom->getGeometryType();
 
@@ -788,7 +788,7 @@ void process_admin_boundary() {
                 "Adminboundaries with geometry=" + std::string(geom->getGeometryName())
                         + " are not yet supported."));
     }
-    build_admin_boundary_relation_with_tags(exterior_way_ids, interior_way_ids);
+    build_admin_boundary_relation_with_tags(exterior_way_ids, interior_way_ids, layer);
 
     g_node_buffer.commit();
     g_way_buffer.commit();
@@ -1136,16 +1136,13 @@ void add_street_shapes(boost::filesystem::path dir, bool test = false) {
 
 void add_admin_shape(boost::filesystem::path admin_shape_file, bool test = false) {
 
-    OGRLayer *layer = read_shape_file(admin_shape_file);
+    ogr_layer_uptr layer(read_shape_file(admin_shape_file));
     assert(layer->GetGeomType() == wkbPolygon);
-    g_cur_layer = layer;
 
-    while ((g_cur_feat = g_cur_layer->GetNextFeature()) != NULL) {
-        process_admin_boundary();
+    while ((g_cur_feat = layer->GetNextFeature()) != NULL) {
+        process_admin_boundary(layer);
         delete g_cur_feat;
     }
-
-    delete layer;
 }
 
 /****************************************************
