@@ -1003,10 +1003,10 @@ void init_g_cntry_ref_map(const boost::filesystem::path& dir, std::ostream& out)
     DBFClose(cntry_ref_handle);
 }
 
-std::vector<OGRLayer*> init_street_layers(const path_vector_type& dirs, std::ostream& out) {
-    std::vector<OGRLayer*> layer_vector;
+ogr_layer_uptr_vector init_street_layers(const path_vector_type& dirs, std::ostream& out) {
+    ogr_layer_uptr_vector layer_vector;
     for (auto dir : dirs) {
-        layer_vector.push_back(read_shape_file( dir / STREETS_SHP, out));
+        layer_vector.push_back(ogr_layer_uptr(read_shape_file( dir / STREETS_SHP, out)));
     }
     return layer_vector;
 }
@@ -1048,13 +1048,13 @@ void init_country_reference(const boost::filesystem::path& dir, std::ostream& ou
     }
 }
 
-z_lvl_map process_z_levels(path_vector_type dirs, std::vector<OGRLayer*>& layer_vector, std::ostream& out) {
+z_lvl_map process_z_levels(path_vector_type dirs, ogr_layer_uptr_vector& layer_vector, std::ostream& out) {
     z_lvl_map z_level_map;
     for (int i = 0; i < layer_vector.size(); i++) {
         boost::filesystem::path dir = dirs.at(i);
-        OGRLayer* layer = layer_vector.at(i);
+        auto& layer = layer_vector.at(i);
         assert(layer->GetGeomType() == wkbLineString);
-        g_cur_layer = layer;
+//        g_cur_layer = layer;
 
         init_z_level_map(read_dbf_file(dir / ZLEVELS_DBF, out), z_level_map);
         init_conditional_driving_manoeuvres(dir, out);
@@ -1063,12 +1063,11 @@ z_lvl_map process_z_levels(path_vector_type dirs, std::vector<OGRLayer*>& layer_
     return z_level_map;
 }
 
-void process_way_end_nodes(std::vector<OGRLayer*>& layer_vector, z_lvl_map& z_level_map) {
+void process_way_end_nodes(ogr_layer_uptr_vector& layer_vector, z_lvl_map& z_level_map) {
     for (int i = 0; i < layer_vector.size(); i++) {
-        OGRLayer* layer = layer_vector.at(i);
-        g_cur_layer = layer;
+        auto& layer = layer_vector.at(i);
         // get all nodes which may be a routable crossing
-        while ((g_cur_feat = g_cur_layer->GetNextFeature()) != NULL) {
+        while ((g_cur_feat = layer->GetNextFeature()) != NULL) {
             link_id_type link_id = get_uint_from_feature(g_cur_feat, LINK_ID);
             // omit way end nodes with different z-levels (they have to be handled extra)
             if (z_level_map.find(link_id) == z_level_map.end())
@@ -1077,15 +1076,14 @@ void process_way_end_nodes(std::vector<OGRLayer*>& layer_vector, z_lvl_map& z_le
         }
         g_node_buffer.commit();
         g_way_buffer.commit();
-        g_cur_layer->ResetReading();
+        layer->ResetReading();
     }
 }
 
-void process_way(std::vector<OGRLayer*>& layer_vector, z_lvl_map& z_level_map) {
+void process_way(ogr_layer_uptr_vector& layer_vector, z_lvl_map& z_level_map) {
     for (int i = 0; i < layer_vector.size(); i++) {
-        OGRLayer* layer = layer_vector.at(i);
-        g_cur_layer = layer;
-        while ((g_cur_feat = g_cur_layer->GetNextFeature()) != NULL) {
+        auto& layer = layer_vector.at(i);
+        while ((g_cur_feat = layer->GetNextFeature()) != NULL) {
             process_way(static_cast<OGRLineString*>(g_cur_feat->GetGeometryRef()), &z_level_map);
             delete g_cur_feat;
         }
@@ -1106,8 +1104,7 @@ void add_street_shapes(path_vector_type dirs, bool test = false) {
 
     std::ostream& out = test ? cnull : std::cerr;
 
-    // read all Street layers
-    std::vector<OGRLayer*> layer_vector = init_street_layers(dirs, out);
+    ogr_layer_uptr_vector layer_vector = init_street_layers(dirs, out);
 
     out << " processing z-levels" << std::endl;
     z_lvl_map z_level_map = process_z_levels(dirs, layer_vector, out);
@@ -1119,8 +1116,8 @@ void add_street_shapes(path_vector_type dirs, bool test = false) {
     process_way(layer_vector, z_level_map);
 
     out << " clean" << std::endl;
-    for (OGRLayer* layer : layer_vector)
-        delete layer;
+//    for (OGRLayer* layer : layer_vector)
+//        delete layer;
     for (auto elem : z_level_map)
         elem.second.clear();
     z_level_map.clear();
