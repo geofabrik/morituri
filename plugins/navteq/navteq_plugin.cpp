@@ -39,17 +39,17 @@ bool navteq_plugin::is_valid_format(std::string filename) {
 }
 
 bool navteq_plugin::check_files(boost::filesystem::path dir) {
-    if (!shp_file_exists(boost::filesystem::path(dir / STREETS_SHP))) return false;
-    if (!shp_file_exists(boost::filesystem::path(dir / ADMINBNDY_1_SHP))) std::cerr << "  administrative boundaries level 1 are missing\n";
-    if (!shp_file_exists(boost::filesystem::path(dir / ADMINBNDY_2_SHP))) std::cerr << "  administrative boundaries level 2 are missing\n";
-    if (!shp_file_exists(boost::filesystem::path(dir / ADMINBNDY_3_SHP))) std::cerr << "  administrative boundaries level 3 are missing\n";
-    if (!shp_file_exists(boost::filesystem::path(dir / ADMINBNDY_4_SHP))) std::cerr << "  administrative boundaries level 4 are missing\n";
-    if (!shp_file_exists(boost::filesystem::path(dir / ADMINBNDY_5_SHP))) std::cerr << "  administrative boundaries level 5 are missing\n";
+    if (!shp_file_exists(dir / STREETS_SHP)) return false;
+    if (!shp_file_exists(dir / ADMINBNDY_1_SHP)) std::cerr << "  administrative boundaries level 1 are missing\n";
+    if (!shp_file_exists(dir / ADMINBNDY_2_SHP)) std::cerr << "  administrative boundaries level 2 are missing\n";
+    if (!shp_file_exists(dir / ADMINBNDY_3_SHP)) std::cerr << "  administrative boundaries level 3 are missing\n";
+    if (!shp_file_exists(dir / ADMINBNDY_4_SHP)) std::cerr << "  administrative boundaries level 4 are missing\n";
+    if (!shp_file_exists(dir / ADMINBNDY_5_SHP)) std::cerr << "  administrative boundaries level 5 are missing\n";
 
-    if (!dbf_file_exists(boost::filesystem::path(dir / MTD_AREA_DBF ))) return false;
-    if (!dbf_file_exists(boost::filesystem::path(dir / RDMS_DBF     ))) return false;
-    if (!dbf_file_exists(boost::filesystem::path(dir / CDMS_DBF     ))) return false;
-    if (!dbf_file_exists(boost::filesystem::path(dir / ZLEVELS_DBF  ))) return false;
+    if (!dbf_file_exists(dir / MTD_AREA_DBF )) return false;
+    if (!dbf_file_exists(dir / RDMS_DBF     )) return false;
+    if (!dbf_file_exists(dir / CDMS_DBF     )) return false;
+    if (!dbf_file_exists(dir / ZLEVELS_DBF  )) return false;
     return true;
 }
 
@@ -61,7 +61,7 @@ bool navteq_plugin::check_files(boost::filesystem::path dir) {
  */
 
 void navteq_plugin::recurse_dir(boost::filesystem::path dir) {
-    if (check_files(dir)) sub_dirs.push_back(dir/*.filename()*/);
+    if (check_files(dir)) dirs.push_back(dir);
 
     for (auto& itr : boost::make_iterator_range(boost::filesystem::directory_iterator(dir), { })) {
         if (boost::filesystem::is_directory(itr)){
@@ -83,11 +83,12 @@ bool navteq_plugin::check_input(boost::filesystem::path input_path, boost::files
     }
 
     recurse_dir(input_path);
-    if (sub_dirs.empty()) return false;
 
-    std::cout << "sub_dirs: " << std::endl;
-    for (auto& i : sub_dirs)
-        std::cout << i.string() << std::endl;
+    if (dirs.empty()) return false;
+
+    std::cout << "dirs: " << std::endl;
+    for (auto& dir : dirs)
+        std::cout << dir << std::endl;
 
     this->plugin_setup(input_path, output_file);
     return true;
@@ -108,26 +109,26 @@ void navteq_plugin::write_output() {
 
 void navteq_plugin::add_administrative_boundaries() {
     // todo admin-levels only apply to the US => more generic for all countries
-    for (auto sub_dir : sub_dirs){
-        process_meta_areas(read_dbf_file(sub_dir / MTD_AREA_DBF));
+    for (auto dir : dirs){
+        process_meta_areas(dir);
     }
 
-    for (auto sub_dir : sub_dirs) {
-        if (shp_file_exists(sub_dir / ADMINBNDY_1_SHP)) add_admin_shape(sub_dir / ADMINBNDY_1_SHP);
-        if (shp_file_exists(sub_dir / ADMINBNDY_2_SHP)) add_admin_shape(sub_dir / ADMINBNDY_2_SHP);
-        if (shp_file_exists(sub_dir / ADMINBNDY_3_SHP)) add_admin_shape(sub_dir / ADMINBNDY_3_SHP);
-        if (shp_file_exists(sub_dir / ADMINBNDY_4_SHP)) add_admin_shape(sub_dir / ADMINBNDY_4_SHP);
-        if (shp_file_exists(sub_dir / ADMINBNDY_5_SHP)) add_admin_shape(sub_dir / ADMINBNDY_5_SHP);
+    for (auto dir : dirs) {
+        if (shp_file_exists(dir / ADMINBNDY_1_SHP)) add_admin_shape(dir / ADMINBNDY_1_SHP);
+        if (shp_file_exists(dir / ADMINBNDY_2_SHP)) add_admin_shape(dir / ADMINBNDY_2_SHP);
+        if (shp_file_exists(dir / ADMINBNDY_3_SHP)) add_admin_shape(dir / ADMINBNDY_3_SHP);
+        if (shp_file_exists(dir / ADMINBNDY_4_SHP)) add_admin_shape(dir / ADMINBNDY_4_SHP);
+        if (shp_file_exists(dir / ADMINBNDY_5_SHP)) add_admin_shape(dir / ADMINBNDY_5_SHP);
     }
     g_mtd_area_map.clear();
 }
 
 void navteq_plugin::execute() {
 
-    add_street_shapes(sub_dirs);
+    add_street_shapes(dirs);
     assert__id_uniqueness();
 
-    add_turn_restrictions(sub_dirs);
+    add_turn_restrictions(dirs);
     assert__id_uniqueness();
 
     add_administrative_boundaries();

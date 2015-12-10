@@ -800,7 +800,8 @@ void process_admin_boundary() {
  * 		  administrative boundaries.
  * \param handle file handle to navteq administrative meta data.
  */
-void process_meta_areas(DBFHandle handle) {
+void process_meta_areas(boost::filesystem::path dir) {
+    DBFHandle handle = read_dbf_file(dir / MTD_AREA_DBF);
 
     link_id_type last_link_id;
     for (int i = 0; i < DBFGetRecordCount(handle); i++) {
@@ -808,24 +809,25 @@ void process_meta_areas(DBFHandle handle) {
         osmium::unsigned_object_id_type area_id = dbf_get_uint_by_field(handle, i, AREA_ID);
 
         mtd_area_dataset data;
-        if (g_mtd_area_map.find(area_id) != g_mtd_area_map.end()) data = g_mtd_area_map.at(area_id);
-
+        if (g_mtd_area_map.find(area_id) != g_mtd_area_map.end()){
+            data = g_mtd_area_map.at(area_id);
+        }
         data.area_id = area_id;
 
         std::string admin_lvl = std::to_string(dbf_get_uint_by_field(handle, i, ADMIN_LVL));
 
-        if (data.admin_lvl.empty())
+        if (data.admin_lvl.empty()) {
             data.admin_lvl = admin_lvl;
-        else if (data.admin_lvl != admin_lvl)
+        } else if (data.admin_lvl != admin_lvl) {
             std::cerr << "entry with area_id=" << area_id << " has multiple admin_lvls:" << data.admin_lvl << ", "
                     << admin_lvl << std::endl;
+        }
 
         std::string lang_code = dbf_get_string_by_field(handle, i, LANG_CODE);
         std::string area_name = dbf_get_string_by_field(handle, i, AREA_NAME);
         data.lang_code_2_area_name.push_back(std::make_pair(lang_code, to_camel_case_with_spaces(area_name)));
 
         g_mtd_area_map.insert(std::make_pair(area_id, data));
-//		data.print();
     }
     DBFClose(handle);
 }
@@ -924,14 +926,14 @@ void init_cdms_map(DBFHandle cdms_handle, std::map<osmium::unsigned_object_id_ty
  * \param handle DBF file handle to navteq manoeuvres.
  * */
 
-void add_turn_restrictions(path_vector_type sub_dirs) {
+void add_turn_restrictions(path_vector_type dirs) {
     // maps COND_ID to COND_TYPE
     std::map<osmium::unsigned_object_id_type, ushort> cdms_map;
-    for (auto sub_dir : sub_dirs)
-        init_cdms_map(read_dbf_file(sub_dir / CDMS_DBF), cdms_map);
+    for (auto dir : dirs)
+        init_cdms_map(read_dbf_file(dir / CDMS_DBF), cdms_map);
 
-    for (auto sub_dir : sub_dirs) {
-        DBFHandle rdms_handle = read_dbf_file(sub_dir / RDMS_DBF);
+    for (auto dir : dirs) {
+        DBFHandle rdms_handle = read_dbf_file(dir / RDMS_DBF);
         for (int i = 0; i < DBFGetRecordCount(rdms_handle); i++) {
 
             link_id_type link_id = dbf_get_uint_by_field(rdms_handle, i, LINK_ID);
@@ -999,14 +1001,12 @@ void init_g_cntry_ref_map(const boost::filesystem::path& dir, std::ostream& out)
     DBFClose(cntry_ref_handle);
 }
 
-void init_street_layers(const path_vector_type& sub_dirs, bool test, std::vector<OGRLayer*>& layer_vector) {
-    for (auto sub_dir : sub_dirs) {
-        OGRLayer* layer;
-        if (test) layer = read_shape_file( sub_dir / STREETS_SHP, cnull);
-        else layer = read_shape_file( sub_dir / STREETS_SHP);
-
-        layer_vector.push_back(layer);
+std::vector<OGRLayer*> init_street_layers(const path_vector_type& dirs, std::ostream& out) {
+    std::vector<OGRLayer*> layer_vector;
+    for (auto dir : dirs) {
+        layer_vector.push_back(read_shape_file( dir / STREETS_SHP, out));
     }
+    return layer_vector;
 }
 
 // \brief stores z_levels in z_level_map for later use. Maps link_ids to pairs of indices and z-levels of waypoints with z-levels not equal 0.
@@ -1032,17 +1032,61 @@ void init_z_level_map(DBFHandle handle, z_lvl_map& z_level_map) {
     if (!v.empty()) z_level_map.insert(std::make_pair(last_link_id, v));
 }
 
-void init_conditional_driving_manoeuvres(const boost::filesystem::path& sub_dir, std::ostream& out) {
-    if (dbf_file_exists(sub_dir / CND_MOD_DBF) && dbf_file_exists(sub_dir / CDMS_DBF)) {
-        init_g_cnd_mod_map(sub_dir, out);
-        init_g_cdms_map(sub_dir, out);
+void init_conditional_driving_manoeuvres(const boost::filesystem::path& dir, std::ostream& out) {
+    if (dbf_file_exists(dir / CND_MOD_DBF) && dbf_file_exists(dir / CDMS_DBF)) {
+        init_g_cnd_mod_map(dir, out);
+        init_g_cdms_map(dir, out);
     }
 }
 
-void init_country_reference(const boost::filesystem::path& sub_dir, std::ostream& out) {
-    if (dbf_file_exists(sub_dir / MTD_AREA_DBF) && dbf_file_exists(sub_dir / MTD_CNTRY_REF_DBF)) {
-        init_g_area_to_govt_code_map(sub_dir, out);
-        init_g_cntry_ref_map(sub_dir, out);
+void init_country_reference(const boost::filesystem::path& dir, std::ostream& out) {
+    if (dbf_file_exists(dir / MTD_AREA_DBF) && dbf_file_exists(dir / MTD_CNTRY_REF_DBF)) {
+        init_g_area_to_govt_code_map(dir, out);
+        init_g_cntry_ref_map(dir, out);
+    }
+}
+
+z_lvl_map process_z_levels(path_vector_type dirs, std::vector<OGRLayer*>& layer_vector, std::ostream& out) {
+    z_lvl_map z_level_map;
+    for (int i = 0; i < layer_vector.size(); i++) {
+        boost::filesystem::path dir = dirs.at(i);
+        OGRLayer* layer = layer_vector.at(i);
+        assert(layer->GetGeomType() == wkbLineString);
+        g_cur_layer = layer;
+
+        init_z_level_map(read_dbf_file(dir / ZLEVELS_DBF, out), z_level_map);
+        init_conditional_driving_manoeuvres(dir, out);
+        init_country_reference(dir, out);
+    }
+    return z_level_map;
+}
+
+void process_way_end_nodes(std::vector<OGRLayer*>& layer_vector, z_lvl_map& z_level_map) {
+    for (int i = 0; i < layer_vector.size(); i++) {
+        OGRLayer* layer = layer_vector.at(i);
+        g_cur_layer = layer;
+        // get all nodes which may be a routable crossing
+        while ((g_cur_feat = g_cur_layer->GetNextFeature()) != NULL) {
+            link_id_type link_id = get_uint_from_feature(g_cur_feat, LINK_ID);
+            // omit way end nodes with different z-levels (they have to be handled extra)
+            if (z_level_map.find(link_id) == z_level_map.end())
+                process_way_end_nodes(static_cast<OGRLineString*>(g_cur_feat->GetGeometryRef()));
+            delete g_cur_feat;
+        }
+        g_node_buffer.commit();
+        g_way_buffer.commit();
+        g_cur_layer->ResetReading();
+    }
+}
+
+void process_way(std::vector<OGRLayer*>& layer_vector, z_lvl_map& z_level_map) {
+    for (int i = 0; i < layer_vector.size(); i++) {
+        OGRLayer* layer = layer_vector.at(i);
+        g_cur_layer = layer;
+        while ((g_cur_feat = g_cur_layer->GetNextFeature()) != NULL) {
+            process_way(static_cast<OGRLineString*>(g_cur_feat->GetGeometryRef()), &z_level_map);
+            delete g_cur_feat;
+        }
     }
 }
 
@@ -1056,53 +1100,23 @@ void init_country_reference(const boost::filesystem::path& sub_dir, std::ostream
  * \param layer Pointer to administrative layer.
  */
 
-void add_street_shapes(path_vector_type sub_dirs, bool test = false) {
+void add_street_shapes(path_vector_type dirs, bool test = false) {
+
+    std::ostream& out = test ? cnull : std::cerr;
 
     // read all Street layers
-    std::vector<OGRLayer*> layer_vector;
-    init_street_layers(sub_dirs, test, layer_vector);
+    std::vector<OGRLayer*> layer_vector = init_street_layers(dirs, out);
 
-    std::cout << " processing z-levels" << std::endl;
-    z_lvl_map z_level_map;
-    for (int i = 0; i<layer_vector.size(); i++){
-        boost::filesystem::path sub_dir = sub_dirs.at(i);
-        OGRLayer* layer = layer_vector.at(i);
-        assert(layer->GetGeomType() == wkbLineString);
-        g_cur_layer = layer;
+    out << " processing z-levels" << std::endl;
+    z_lvl_map z_level_map = process_z_levels(dirs, layer_vector, out);
 
-        std::ostream& out = test ? std::cerr : cnull;
+    out << " processing way end points" << std::endl;
+    process_way_end_nodes(layer_vector, z_level_map);
 
-        init_z_level_map(read_dbf_file(sub_dir / ZLEVELS_DBF, out), z_level_map);
-        init_conditional_driving_manoeuvres(sub_dir, out);
-        init_country_reference(sub_dir, out);
-    }
+    out << " processing ways" << std::endl;
+    process_way(layer_vector, z_level_map);
 
-    std::cout << " processing way end points" << std::endl;
-    for (int i = 0; i<layer_vector.size(); i++){
-        OGRLayer* layer = layer_vector.at(i);
-        g_cur_layer = layer;
-        // get all nodes which may be a routable crossing
-        while ((g_cur_feat = g_cur_layer->GetNextFeature()) != NULL){
-            link_id_type link_id = get_uint_from_feature(g_cur_feat, LINK_ID);
-            // omit way end nodes with different z-levels (they have to be handled extra)
-            if (z_level_map.find(link_id) == z_level_map.end())
-                process_way_end_nodes(static_cast<OGRLineString*>(g_cur_feat->GetGeometryRef()));
-            delete g_cur_feat;
-        }
-        g_node_buffer.commit();
-        g_way_buffer.commit();
-        g_cur_layer->ResetReading();
-    }
-    std::cout << " processing ways" << std::endl;
-    for (int i = 0; i<layer_vector.size(); i++){
-        OGRLayer* layer = layer_vector.at(i);
-        g_cur_layer = layer;
-        while ((g_cur_feat = g_cur_layer->GetNextFeature()) != NULL){
-            process_way(static_cast<OGRLineString*>(g_cur_feat->GetGeometryRef()), &z_level_map);
-            delete g_cur_feat;
-        }
-    }
-    std::cout << " clean" << std::endl;
+    out << " clean" << std::endl;
     for (OGRLayer* layer : layer_vector)
         delete layer;
     for (auto elem : z_level_map)
@@ -1110,10 +1124,10 @@ void add_street_shapes(path_vector_type sub_dirs, bool test = false) {
     z_level_map.clear();
 }
 
-void add_street_shapes(boost::filesystem::path dir, boost::filesystem::path sub_dir, bool test = false) {
-    std::vector<boost::filesystem::path> sub_dir_vector;
-    sub_dir_vector.push_back(sub_dir);
-    add_street_shapes(sub_dir_vector, test);
+void add_street_shapes(boost::filesystem::path dir, bool test = false) {
+    std::vector<boost::filesystem::path> dir_vector;
+    dir_vector.push_back(dir);
+    add_street_shapes(dir_vector, test);
 }
 
 /**
@@ -1153,7 +1167,7 @@ void clear_all() {
     g_mtd_area_map.clear();
 }
 
-void add_buffer_ids(std::vector<osmium::unsigned_object_id_type>& v, osmium::memory::Buffer& buf) {
+void add_buffer_ids(osm_id_vector_type& v, osmium::memory::Buffer& buf) {
     for (auto& it : buf) {
         osmium::OSMObject* obj = static_cast<osmium::OSMObject*>(&it);
         v.push_back((osmium::unsigned_object_id_type) (obj->id()));
@@ -1161,7 +1175,7 @@ void add_buffer_ids(std::vector<osmium::unsigned_object_id_type>& v, osmium::mem
 }
 
 void assert__id_uniqueness() {
-    std::vector < osmium::unsigned_object_id_type > v;
+    osm_id_vector_type v;
     add_buffer_ids(v, g_node_buffer);
     add_buffer_ids(v, g_way_buffer);
     add_buffer_ids(v, g_rel_buffer);

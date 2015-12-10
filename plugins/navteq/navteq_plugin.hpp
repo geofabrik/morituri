@@ -20,7 +20,7 @@ private:
     void write_output();
     void add_administrative_boundaries();
 
-    std::vector<boost::filesystem::path> sub_dirs;
+    std::vector<boost::filesystem::path> dirs;
 
 public:
 
