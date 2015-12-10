@@ -50,7 +50,7 @@ osmium::unsigned_object_id_type g_osm_id = 1;
 link_id_map_type g_link_id_map;
 
 // Provides access to elements in g_way_buffer through offsets
-osm_id_to_offset_map g_way_offset_map;
+osm_id_to_offset_map_type g_way_offset_map;
 
 // data structure to store admin boundary tags
 struct mtd_area_dataset {
@@ -668,7 +668,7 @@ node_vector_type create_admin_boundary_way_nodes(OGRLinearRing* ring) {
  * \brief creates ways for administrative boundary
  * \return osm_ids of created ways
  */
-osm_id_vector_type create_admin_boundary_ways(OGRLinearRing* ring) {
+osm_id_vector_type build_admin_boundary_ways(OGRLinearRing* ring) {
     node_vector_type osm_way_node_ids = create_admin_boundary_way_nodes(ring);
 
     osm_id_vector_type osm_way_ids;
@@ -744,32 +744,31 @@ osmium::unsigned_object_id_type build_admin_boundary_relation_with_tags(osm_id_v
 /**
  * \brief handles administrative boundary multipolygons
  */
-void create_admin_boundary_multipolygon(OGRMultiPolygon* mp) {
-    osm_id_vector_type mp_ext_ring_osm_ids, mp_int_ring_osm_ids;
+void create_admin_boundary_member(OGRMultiPolygon* mp, osm_id_vector_type& mp_ext_ring_osm_ids,
+        osm_id_vector_type& mp_int_ring_osm_ids) {
 
     for (int i = 0; i < mp->getNumGeometries(); i++){
         OGRPolygon* poly = static_cast<OGRPolygon*>(mp->getGeometryRef(i));
 
-        osm_id_vector_type exterior_way_ids = create_admin_boundary_ways(poly->getExteriorRing());
+        osm_id_vector_type exterior_way_ids = build_admin_boundary_ways(poly->getExteriorRing());
         // append osm_way_ids to relation_member_ids
         std::move(exterior_way_ids.begin(), exterior_way_ids.end(), std::back_inserter(mp_ext_ring_osm_ids));
 
         for (int i=0; i<poly->getNumInteriorRings(); i++){
-            auto interior_way_ids = create_admin_boundary_ways(poly->getInteriorRing(i));
+            auto interior_way_ids = build_admin_boundary_ways(poly->getInteriorRing(i));
             std::move(interior_way_ids.begin(), interior_way_ids.end(), std::back_inserter(mp_int_ring_osm_ids));
         }
     }
-    build_admin_boundary_relation_with_tags(mp_ext_ring_osm_ids, mp_int_ring_osm_ids);
 }
 
-void create_admin_boundary_polygon(OGRPolygon* poly) {
-    osm_id_vector_type exterior_way_ids = create_admin_boundary_ways(poly->getExteriorRing());
-    osm_id_vector_type interior_way_ids;
+void create_admin_boundary_member(OGRPolygon* poly, osm_id_vector_type& exterior_way_ids,
+        osm_id_vector_type& interior_way_ids) {
+    exterior_way_ids = build_admin_boundary_ways(poly->getExteriorRing());
+
     for (int i = 0; i < poly->getNumInteriorRings(); i++) {
-        auto tmp = create_admin_boundary_ways(poly->getInteriorRing(i));
+        auto tmp = build_admin_boundary_ways(poly->getInteriorRing(i));
         std::move(tmp.begin(), tmp.end(), std::back_inserter(interior_way_ids));
     }
-    build_admin_boundary_relation_with_tags(exterior_way_ids, interior_way_ids);
 }
 
 /**
@@ -778,15 +777,18 @@ void create_admin_boundary_polygon(OGRPolygon* poly) {
 void process_admin_boundary() {
     auto geom = g_cur_feat->GetGeometryRef();
     auto geom_type = geom->getGeometryType();
+
+    osm_id_vector_type exterior_way_ids, interior_way_ids;
     if (geom_type == wkbMultiPolygon) {
-        create_admin_boundary_multipolygon(static_cast<OGRMultiPolygon*>(geom));
+        create_admin_boundary_member(static_cast<OGRMultiPolygon*>(geom), exterior_way_ids, interior_way_ids);
     } else if (geom_type == wkbPolygon) {
-        create_admin_boundary_polygon(static_cast<OGRPolygon*>(geom));
+        create_admin_boundary_member(static_cast<OGRPolygon*>(geom), exterior_way_ids, interior_way_ids);
     } else {
         throw(std::runtime_error(
                 "Adminboundaries with geometry=" + std::string(geom->getGeometryName())
                         + " are not yet supported."));
     }
+    build_admin_boundary_relation_with_tags(exterior_way_ids, interior_way_ids);
 
     g_node_buffer.commit();
     g_way_buffer.commit();

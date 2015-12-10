@@ -94,6 +94,9 @@ typedef std::pair<osmium::Location, z_lvl_type> node_id_type;
 typedef std::map<node_id_type, osmium::unsigned_object_id_type> z_lvl_nodes_map_type;
 
 
-typedef osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, size_t> osm_id_to_offset_map;
+typedef osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, size_t> osm_id_to_offset_map_type;
+
+typedef std::unique_ptr<OGRLayer> ogr_layer_uptr;
+typedef std::vector<ogr_layer_uptr> ogr_layer_uptr_vector;
 
 #endif /* PLUGINS_NAVTEQ_NAVTEQ_TYPES_HPP_ */
