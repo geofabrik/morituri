@@ -86,7 +86,7 @@ typedef std::vector<link_id_type> link_id_vector_type;
 typedef short z_lvl_type;
 
 // maps navteq link_ids to pairs of <index, z_lvl>
-typedef std::map<uint64_t, std::vector<std::pair<ushort, z_lvl_type>>>z_lvl_map;
+typedef std::map<link_id_type, std::vector<std::pair<ushort, z_lvl_type>>>z_lvl_map;
 
 // pair [Location, z_level] identifies nodes precisely
 typedef std::pair<osmium::Location, z_lvl_type> node_id_type;

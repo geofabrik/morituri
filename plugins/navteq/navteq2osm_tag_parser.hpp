@@ -177,7 +177,7 @@ void add_here_speed_cat_tag(osmium::builder::TagListBuilder* builder, OGRFeature
  * \param cntry_map maps govt_codes to cntry_ref_types
  * \return returns false if any of the areas contain metric units
  */
-bool is_imperial(uint64_t l_area_id, uint64_t r_area_id, area_id_govt_code_map_type* area_govt_map,
+bool is_imperial(area_id_type l_area_id, area_id_type r_area_id, area_id_govt_code_map_type* area_govt_map,
         cntry_ref_map_type* cntry_map) {
     if (area_govt_map->find(l_area_id) != area_govt_map->end())
         if (cntry_map->find(area_govt_map->at(l_area_id)) != cntry_map->end())
@@ -193,8 +193,8 @@ bool is_imperial(uint64_t l_area_id, uint64_t r_area_id, area_id_govt_code_map_t
 /**
  * \brief adds maxheight, maxwidth, maxlength, maxweight and maxaxleload tags.
  */
-void add_additional_restrictions(osmium::builder::TagListBuilder* builder, uint64_t link_id, uint64_t l_area_id,
-        uint64_t r_area_id, cdms_map_type* cdms_map, cnd_mod_map_type* cnd_mod_map,
+void add_additional_restrictions(osmium::builder::TagListBuilder* builder, link_id_type link_id, area_id_type l_area_id,
+        area_id_type r_area_id, cdms_map_type* cdms_map, cnd_mod_map_type* cnd_mod_map,
         area_id_govt_code_map_type* area_govt_map, cntry_ref_map_type* cntry_map) {
     if (!cdms_map || !cnd_mod_map) return;
 
@@ -266,7 +266,7 @@ void add_lanes_tag(osmium::builder::TagListBuilder* builder, OGRFeature* f) {
     if (strcmp(number_of_physical_lanes, "0")) builder->add_tag("lanes", number_of_physical_lanes);
 }
 
-void add_highway_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f, uint64_t link_id,
+void add_highway_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f, link_id_type link_id,
         cdms_map_type* cdms_map, cnd_mod_map_type* cnd_mod_map) {
     add_highway_tag(builder, get_field_from_feature(f, FUNC_CLASS));
     add_one_way_tag(builder, get_field_from_feature(f, DIR_TRAVEL));
@@ -286,11 +286,11 @@ void add_highway_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f, u
  * \brief maps navteq tags for access, tunnel, bridge, etc. to osm tags
  * \return link id of processed feature.
  */
-uint64_t parse_street_tags(osmium::builder::TagListBuilder *builder, OGRFeature* f, cdms_map_type* cdms_map = nullptr,
-        cnd_mod_map_type* cnd_mod_map = nullptr, area_id_govt_code_map_type* area_govt_map = nullptr,
+link_id_type parse_street_tags(osmium::builder::TagListBuilder *builder, OGRFeature* f, cdms_map_type* cdms_map =
+        nullptr, cnd_mod_map_type* cnd_mod_map = nullptr, area_id_govt_code_map_type* area_govt_map = nullptr,
         cntry_ref_map_type* cntry_map = nullptr) {
     const char* link_id_s = get_field_from_feature(f, LINK_ID);
-    uint64_t link_id = std::stoul(link_id_s);
+    link_id_type link_id = std::stoul(link_id_s);
     builder->add_tag(LINK_ID, link_id_s); // tag for debug purpose
 
     builder->add_tag("name", to_camel_case_with_spaces(get_field_from_feature(f, ST_NAME)).c_str());
@@ -300,8 +300,8 @@ uint64_t parse_street_tags(osmium::builder::TagListBuilder *builder, OGRFeature*
         add_highway_tags(builder, f, link_id, cdms_map, cnd_mod_map);
     }
 
-    uint64_t l_area_id = get_uint_from_feature(f, L_AREA_ID);
-    uint64_t r_area_id = get_uint_from_feature(f, R_AREA_ID);
+    area_id_type l_area_id = get_uint_from_feature(f, L_AREA_ID);
+    area_id_type r_area_id = get_uint_from_feature(f, R_AREA_ID);
     // tags which apply to highways and ferry routes
     add_additional_restrictions(builder, link_id, l_area_id, r_area_id, cdms_map, cnd_mod_map, area_govt_map,
             cntry_map);
