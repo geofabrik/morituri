@@ -9,6 +9,7 @@
 #define NAVTEQPLUGIN_HPP_
 
 #include "../base_plugin.hpp"
+#include "navteq_types.hpp"
 #include <boost/filesystem/path.hpp>
 #include <string>
 
@@ -20,7 +21,7 @@ private:
     void write_output();
     void add_administrative_boundaries();
 
-    std::vector<boost::filesystem::path> dirs;
+    path_vector_type dirs;
 
 public:
 

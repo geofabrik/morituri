@@ -24,8 +24,8 @@
 
 #include "comm2osm_exceptions.hpp"
 #include "navteq2osm_tag_parser.hpp"
-#include "readers.hpp"
-#include "util.hpp"
+#include "../readers.hpp"
+#include "navteq_util.hpp"
 #include "navteq_mappings.hpp"
 #include "navteq_types.hpp"
 
@@ -75,12 +75,6 @@ cdms_map_type g_cdms_map;
 std::map<area_id_type, govt_code_type> g_area_to_govt_code_map;
 cntry_ref_map_type g_cntry_ref_map;
 
-// current layer
-OGRLayer* g_cur_layer;
-
-// current feature
-OGRFeature* g_cur_feat;
-
 /**
  * \brief Dummy attributes enable josm to read output xml files.
  *
@@ -100,8 +94,7 @@ void set_dummy_osm_object_attributes(osmium::OSMObject& obj) {
  * \param rml_builder relation member list builder of turn restriction
  */
 
-void add_common_node_as_via(std::vector<osmium::unsigned_object_id_type>* osm_ids,
-    osmium::builder::RelationMemberListBuilder& rml_builder) {
+void add_common_node_as_via(osm_id_vector_type* osm_ids, osmium::builder::RelationMemberListBuilder& rml_builder) {
     assert(osm_ids->size() == 2);
 
     const osmium::Way &from_way = g_way_buffer.get<const osmium::Way>(g_way_offset_map.get(osm_ids->at(0)));
@@ -119,19 +112,19 @@ void add_common_node_as_via(std::vector<osmium::unsigned_object_id_type>* osm_id
         }
         rml_builder.add_member(osmium::item_type::node, g_way_end_points_map.at(from_way_front), "via");
     } else if (from_way_front == to_way_back) {
-        if (g_way_end_points_map.find(from_way_front) == g_way_end_points_map.end())  {
+        if (g_way_end_points_map.find(from_way_front) == g_way_end_points_map.end()) {
             std::cerr << "Skipping via node: " << from_way_front << " is not in g_way_end_points_map." << std::endl;
             return;
         }
         rml_builder.add_member(osmium::item_type::node, g_way_end_points_map.at(from_way_front), "via");
     } else if (from_way_back == to_way_front) {
-        if (g_way_end_points_map.find(from_way_back) == g_way_end_points_map.end())  {
+        if (g_way_end_points_map.find(from_way_back) == g_way_end_points_map.end()) {
             std::cerr << "Skipping via node: " << from_way_back << " is not in g_way_end_points_map." << std::endl;
             return;
         }
         rml_builder.add_member(osmium::item_type::node, g_way_end_points_map.at(from_way_back), "via");
     } else {
-        if (g_way_end_points_map.find(from_way_back) == g_way_end_points_map.end())  {
+        if (g_way_end_points_map.find(from_way_back) == g_way_end_points_map.end()) {
             std::cerr << "Skipping via node: " << from_way_back << " is not in g_way_end_points_map." << std::endl;
             return;
         }
@@ -148,7 +141,7 @@ void add_common_node_as_via(std::vector<osmium::unsigned_object_id_type>* osm_id
  * \param osm_ids vector with osm_ids of ways which belong to the turn restriction
  * \return Last number of committed bytes to m_buffer before this commit.
  */
-size_t build_turn_restriction(std::vector<osmium::unsigned_object_id_type> *osm_ids) {
+size_t build_turn_restriction(osm_id_vector_type *osm_ids) {
 
     osmium::builder::RelationBuilder builder(g_rel_buffer);
     STATIC_RELATION(builder.object()).set_id(std::to_string(g_osm_id++).c_str());
@@ -181,10 +174,11 @@ size_t build_turn_restriction(std::vector<osmium::unsigned_object_id_type> *osm_
  * \return link id of parsed feature.
  */
 
-link_id_type build_tag_list(osmium::builder::Builder* builder, osmium::memory::Buffer& buf, short z_level = -5) {
+link_id_type build_tag_list(ogr_feature_uptr& feat, osmium::builder::Builder* builder, osmium::memory::Buffer& buf,
+        short z_level = -5) {
     osmium::builder::TagListBuilder tl_builder(buf, builder);
 
-    link_id_type link_id = parse_street_tags(&tl_builder, g_cur_feat, &g_cdms_map, &g_cnd_mod_map, &g_area_to_govt_code_map,
+    link_id_type link_id = parse_street_tags(&tl_builder, feat, &g_cdms_map, &g_cnd_mod_map, &g_area_to_govt_code_map,
             &g_cntry_ref_map);
 
     if (z_level != -5 && z_level != 0) tl_builder.add_tag("layer", std::to_string(z_level).c_str());
@@ -265,8 +259,9 @@ void test__z_lvl_range(short z_lvl) {
  * \param z_lvl z-level of way. initially invalid (-5).
  * \return id of created Way.
  */
-osmium::unsigned_object_id_type build_way(OGRLineString* ogr_ls, node_map_type *node_ref_map = nullptr,
-        bool is_sub_linestring = false, short z_lvl = -5) {
+osmium::unsigned_object_id_type build_way(ogr_feature_uptr& feat, OGRLineString* ogr_ls, node_map_type *node_ref_map =
+        nullptr, bool is_sub_linestring = false, short z_lvl = -5) {
+
     if (is_sub_linestring) test__z_lvl_range(z_lvl);
 
     osmium::builder::WayBuilder builder(g_way_buffer);
@@ -278,12 +273,10 @@ osmium::unsigned_object_id_type build_way(OGRLineString* ogr_ls, node_map_type *
     for (int i = 0; i < ogr_ls->getNumPoints(); i++) {
         osmium::Location location(ogr_ls->getX(i), ogr_ls->getY(i));
         bool is_end_point = i == 0 || i == ogr_ls->getNumPoints() - 1;
-        std::map < osmium::Location, osmium::unsigned_object_id_type > *map_containing_node;
+        std::map<osmium::Location, osmium::unsigned_object_id_type> *map_containing_node;
         if (!is_sub_linestring) {
-            if (is_end_point)
-                map_containing_node = &g_way_end_points_map;
-            else
-                map_containing_node = node_ref_map;
+            if (is_end_point) map_containing_node = &g_way_end_points_map;
+            else map_containing_node = node_ref_map;
         } else {
             if (node_ref_map->find(location) != node_ref_map->end()) {
                 map_containing_node = node_ref_map;
@@ -295,10 +288,11 @@ osmium::unsigned_object_id_type build_way(OGRLineString* ogr_ls, node_map_type *
         }
         add_way_node(location, wnl_builder, map_containing_node);
     }
-    link_id_type link_id = build_tag_list(&builder, g_way_buffer, z_lvl);
+
+    link_id_type link_id = build_tag_list(feat, &builder, g_way_buffer, z_lvl);
     assert(link_id != 0);
     if (g_link_id_map.find(link_id) == g_link_id_map.end())
-        g_link_id_map.insert(std::make_pair(link_id, std::vector<osmium::unsigned_object_id_type>()));
+        g_link_id_map.insert(std::make_pair(link_id, osm_id_vector_type()));
     g_link_id_map.at(link_id).push_back((osmium::unsigned_object_id_type) STATIC_WAY(builder.object()).id());
 
     return STATIC_WAY(builder.object()).id();
@@ -350,10 +344,11 @@ bool is_superior_or_equal(short superior, short than) {
  * \param node_ref_map provides osm_ids of Nodes to a given location.
  * \param z_lvl
  */
-void build_sub_way_by_index(ushort start_index, ushort end_index, OGRLineString* ogr_ls, node_map_type* node_ref_map,
-        short z_lvl = 0) {
+void build_sub_way_by_index(ogr_feature_uptr& feat, ushort start_index, ushort end_index, OGRLineString* ogr_ls,
+        node_map_type* node_ref_map, short z_lvl = 0) {
     OGRLineString ogr_sub_ls = create_sublinestring_geometry(ogr_ls, start_index, end_index);
-    osmium::unsigned_object_id_type way_id = build_way(&ogr_sub_ls, node_ref_map, true, z_lvl);
+    osmium::unsigned_object_id_type way_id = build_way(feat, &ogr_sub_ls, node_ref_map, true, z_lvl);
+
     g_way_offset_map.set(way_id, g_way_buffer.commit());
 }
 
@@ -368,12 +363,14 @@ void build_sub_way_by_index(ushort start_index, ushort end_index, OGRLineString*
  * \param node_ref_map location to osm_id mapping (to preserve uniqueness of node locations)
  * \return start_index
  */
-ushort create_continuing_sub_ways(ushort first_index, ushort start_index, ushort last_index, uint link_id,
-        std::vector<std::pair<ushort, short> >* node_z_level_vector, OGRLineString* ogr_ls, node_map_type* node_ref_map) {
-    for (auto it = node_z_level_vector->cbegin(); it != node_z_level_vector->cend(); ++it) {
+ushort create_continuing_sub_ways(ogr_feature_uptr& feat, ushort first_index, ushort start_index, ushort last_index,
+        uint link_id, const index_z_lvl_vector_type& node_z_level_vector, OGRLineString* ogr_ls,
+        node_map_type* node_ref_map) {
+
+    for (auto it = node_z_level_vector.cbegin(); it != node_z_level_vector.cend(); ++it) {
         short z_lvl = it->second;
         test__z_lvl_range(z_lvl);
-        bool last_element = node_z_level_vector->cend() - 1 == it;
+        bool last_element = node_z_level_vector.cend() - 1 == it;
         bool not_last_element = !last_element;
         ushort index = it->first;
         ushort next_index;
@@ -392,7 +389,7 @@ ushort create_continuing_sub_ways(ushort first_index, ushort start_index, ushort
 
         if (not_last_element) {
             if (index + 2 == next_index && z_lvl == next_z_lvl) continue;
-            bool not_second_last_element = it + 2 != node_z_level_vector->cend();
+            bool not_second_last_element = it + 2 != node_z_level_vector.cend();
             if (not_second_last_element) {
                 ushort second_next_index = (it + 2)->first;
                 short second_next_z_lvl = (it + 2)->second;
@@ -409,20 +406,19 @@ ushort create_continuing_sub_ways(ushort first_index, ushort start_index, ushort
         if (last_element || index + 1 < next_index || z_lvl != next_z_lvl) {
             ushort from = start_index;
             ushort to;
-            if (last_element || index + 1 < next_index || is_superior(z_lvl, next_z_lvl))
-                to = std::min((ushort)(index + 1), last_index);
-            else
-                to = index;
+            if (last_element || index + 1 < next_index || is_superior(z_lvl, next_z_lvl)) to = std::min(
+                    (ushort) (index + 1), last_index);
+            else to = index;
             if (DEBUG)
                 std::cout << " 2 ## " << link_id << " ## " << from << "/" << last_index << "  -  " << to << "/"
                         << last_index << ": \tz_lvl=" << z_lvl << std::endl;
             if (from < to) {
-                build_sub_way_by_index(from, to, ogr_ls, node_ref_map, z_lvl);
+                build_sub_way_by_index(feat, from, to, ogr_ls, node_ref_map, z_lvl);
                 start_index = to;
             }
 
             if (not_last_element && to < next_index - 1) {
-                build_sub_way_by_index(to, next_index - 1, ogr_ls, node_ref_map);
+                build_sub_way_by_index(feat, to, next_index - 1, ogr_ls, node_ref_map);
                 if (DEBUG)
                     std::cout << " 3 ## " << link_id << " ## " << to << "/" << last_index << "  -  " << next_index - 1
                             << "/" << last_index << ": \tz_lvl=" << 0 << std::endl;
@@ -441,11 +437,11 @@ ushort create_continuing_sub_ways(ushort first_index, ushort start_index, ushort
  * \param node_ref_map provides osm_ids of Nodes to a given location.
  * \param link_id link_id of processed feature - for debug only.
  */
-void split_way_by_z_level(OGRLineString* ogr_ls, std::vector<std::pair<ushort, short>> *node_z_level_vector,
-        node_map_type *node_ref_map, uint link_id) {
+void split_way_by_z_level(ogr_feature_uptr& feat, OGRLineString* ogr_ls,
+        const index_z_lvl_vector_type& node_z_level_vector, node_map_type *node_ref_map, uint link_id) {
 
     ushort first_index = 0, last_index = ogr_ls->getNumPoints() - 1;
-    ushort start_index = node_z_level_vector->cbegin()->first;
+    ushort start_index = node_z_level_vector.cbegin()->first;
     if (start_index > 0) start_index--;
 
     // first_index <= start_index < end_index <= last_index
@@ -453,19 +449,18 @@ void split_way_by_z_level(OGRLineString* ogr_ls, std::vector<std::pair<ushort, s
     assert(start_index < last_index);
 
 //	if (DEBUG) print_z_level_map(link_id, true);
-
     if (first_index != start_index) {
-        build_sub_way_by_index(first_index, start_index, ogr_ls, node_ref_map);
+        build_sub_way_by_index(feat, first_index, start_index, ogr_ls, node_ref_map);
         if (DEBUG)
             std::cout << " 1 ## " << link_id << " ## " << first_index << "/" << last_index << "  -  " << start_index
                     << "/" << last_index << ": \tz_lvl=" << 0 << std::endl;
     }
 
-    start_index = create_continuing_sub_ways(first_index, start_index, last_index, link_id, node_z_level_vector, ogr_ls,
-            node_ref_map);
+    start_index = create_continuing_sub_ways(feat, first_index, start_index, last_index, link_id, node_z_level_vector,
+            ogr_ls, node_ref_map);
 
     if (start_index < last_index) {
-        build_sub_way_by_index(start_index, last_index, ogr_ls, node_ref_map);
+        build_sub_way_by_index(feat, start_index, last_index, ogr_ls, node_ref_map);
         if (DEBUG)
             std::cout << " 4 ## " << link_id << " ## " << start_index << "/" << last_index << "  -  " << last_index
                     << "/" << last_index << ": \tz_lvl=" << 0 << std::endl;
@@ -482,7 +477,7 @@ void split_way_by_z_level(OGRLineString* ogr_ls, std::vector<std::pair<ushort, s
  */
 
 void process_end_point(bool first, ushort index, z_lvl_type z_lvl, OGRLineString *ogr_ls, z_lvl_map *z_level_map,
-        std::map<osmium::Location, osmium::unsigned_object_id_type> & node_ref_map) {
+        node_map_type & node_ref_map) {
     ushort i = first ? 0 : ogr_ls->getNumPoints() - 1;
     osmium::Location location(ogr_ls->getX(i), ogr_ls->getY(i));
 
@@ -504,17 +499,16 @@ void process_end_point(bool first, ushort index, z_lvl_type z_lvl, OGRLineString
 }
 
 void process_first_end_point(ushort index, z_lvl_type z_lvl, OGRLineString *ogr_ls, z_lvl_map *z_level_map,
-        std::map<osmium::Location, osmium::unsigned_object_id_type> & node_ref_map) {
+        node_map_type & node_ref_map) {
     process_end_point(true, index, z_lvl, ogr_ls, z_level_map, node_ref_map);
 }
 
 void process_last_end_point(ushort index, z_lvl_type z_lvl, OGRLineString *ogr_ls, z_lvl_map *z_level_map,
-        std::map<osmium::Location, osmium::unsigned_object_id_type> & node_ref_map) {
+        node_map_type & node_ref_map) {
     process_end_point(false, index, z_lvl, ogr_ls, z_level_map, node_ref_map);
 }
 
-void middle_points_preparation(OGRLineString* ogr_ls,
-        std::map<osmium::Location, osmium::unsigned_object_id_type>& node_ref_map) {
+void middle_points_preparation(OGRLineString* ogr_ls, node_map_type& node_ref_map) {
     // creates remaining nodes required for way
     for (int i = 1; i < ogr_ls->getNumPoints() - 1; i++) {
         osmium::Location location(ogr_ls->getX(i), ogr_ls->getY(i));
@@ -527,26 +521,26 @@ void middle_points_preparation(OGRLineString* ogr_ls,
  * \brief replaces all z-levels by zero, which are not an endpoint
  * \param z_lvl_vec vector containing pairs of [z_lvl_index, z_lvl]
  */
-void set_ferry_z_lvls_to_zero(std::vector<std::pair<ushort, z_lvl_type> >& z_lvl_vec) {
+void set_ferry_z_lvls_to_zero(ogr_feature_uptr& feat, index_z_lvl_vector_type& z_lvl_vec) {
     // erase middle z_lvls
     if (z_lvl_vec.size() > 2) z_lvl_vec.erase(z_lvl_vec.begin() + 1, z_lvl_vec.end() - 1);
     // erase first z_lvl if first index references first node
     if (z_lvl_vec.size() > 0 && z_lvl_vec.begin()->first != 0) z_lvl_vec.erase(z_lvl_vec.begin());
     // erase last z_lvl if last index references last node
-    OGRLineString* ogr_ls = static_cast<OGRLineString*>(g_cur_feat->GetGeometryRef());
+    OGRLineString* ogr_ls = static_cast<OGRLineString*>(feat->GetGeometryRef());
     if (z_lvl_vec.size() > 0 && (z_lvl_vec.end() - 1)->first != ogr_ls->getNumPoints() - 1)
         z_lvl_vec.erase(z_lvl_vec.end());
 }
 
-void create_house_numbers(OGRLineString* ogr_ls, bool left){
+void create_house_numbers(ogr_feature_uptr& feat, OGRLineString* ogr_ls, bool left) {
     const char* ref_addr = left ? L_REFADDR : R_REFADDR;
     const char* nref_addr = left ? L_NREFADDR : R_NREFADDR;
     const char* addr_schema = left ? L_ADDRSCH : R_ADDRSCH;
 
-    if (!strcmp(get_field_from_feature(g_cur_feat, ref_addr),"")) return;
-    if (!strcmp(get_field_from_feature(g_cur_feat, nref_addr),"")) return;
-    if (!strcmp(get_field_from_feature(g_cur_feat, addr_schema),"")) return;
-    if (!strcmp(get_field_from_feature(g_cur_feat, addr_schema),"M")) return;
+    if (!strcmp(get_field_from_feature(feat, ref_addr), "")) return;
+    if (!strcmp(get_field_from_feature(feat, nref_addr), "")) return;
+    if (!strcmp(get_field_from_feature(feat, addr_schema), "")) return;
+    if (!strcmp(get_field_from_feature(feat, addr_schema), "M")) return;
 
     OGRLineString* offset_ogr_ls = create_offset_curve(ogr_ls, 0.00005, left);
 
@@ -560,9 +554,9 @@ void create_house_numbers(OGRLineString* ogr_ls, bool left){
         assert(location.valid());
         osmium::unsigned_object_id_type node_id;
         if (i == 0) {
-            node_id = build_node_with_tag(location, "addr:housenumber", get_field_from_feature(g_cur_feat, ref_addr));
+            node_id = build_node_with_tag(location, "addr:housenumber", get_field_from_feature(feat, ref_addr));
         } else if (i == offset_ogr_ls->getNumPoints() - 1) {
-            node_id = build_node_with_tag(location, "addr:housenumber", get_field_from_feature(g_cur_feat, nref_addr));
+            node_id = build_node_with_tag(location, "addr:housenumber", get_field_from_feature(feat, nref_addr));
         } else {
             node_id = build_node(location);
         }
@@ -571,16 +565,16 @@ void create_house_numbers(OGRLineString* ogr_ls, bool left){
     }
     {
         osmium::builder::TagListBuilder tl_builder(g_way_buffer, &way_builder);
-        const char* schema = parse_house_number_schema(get_field_from_feature(g_cur_feat, addr_schema));
+        const char* schema = parse_house_number_schema(get_field_from_feature(feat, addr_schema));
         tl_builder.add_tag("addr:interpolation", schema);
     }
     g_node_buffer.commit();
     g_way_buffer.commit();
 }
 
-void create_house_numbers(OGRLineString* ogr_ls) {
-    create_house_numbers(ogr_ls, true);
-    create_house_numbers(ogr_ls, false);
+void create_house_numbers(ogr_feature_uptr& feat, OGRLineString* ogr_ls) {
+    create_house_numbers(feat, ogr_ls, true);
+    create_house_numbers(feat, ogr_ls, false);
 }
 
 /**
@@ -589,29 +583,34 @@ void create_house_numbers(OGRLineString* ogr_ls) {
  * \param ogr_ls linestring which provides the geometry.
  * \param z_level_map holds z_levels to Nodes of Ways.
  */
-void process_way(OGRLineString *ogr_ls, z_lvl_map *z_level_map) {
-    std::map<osmium::Location, osmium::unsigned_object_id_type> node_ref_map;
+void process_way(ogr_feature_uptr& feat, z_lvl_map *z_level_map) {
 
+    node_map_type node_ref_map;
+
+    OGRLineString *ogr_ls = static_cast<OGRLineString*>(feat->GetGeometryRef());
     // creates remaining nodes required for way
     middle_points_preparation(ogr_ls, node_ref_map);
     if (ogr_ls->getNumPoints() > 2) assert(node_ref_map.size() > 0);
 
-    link_id_type link_id = get_uint_from_feature(g_cur_feat, LINK_ID);
+    link_id_type link_id = get_uint_from_feature(feat, LINK_ID);
 
     auto it = z_level_map->find(link_id);
     if (it == z_level_map->end()) {
-        osmium::unsigned_object_id_type way_id = build_way(ogr_ls, &node_ref_map);
+        osmium::unsigned_object_id_type way_id = build_way(feat, ogr_ls, &node_ref_map);
         g_way_offset_map.set(way_id, g_way_buffer.commit());
     } else {
+        index_z_lvl_vector_type& index_z_lvl_vector = it->second;
+
         // way with different z_levels
-        auto first_point_with_different_z_lvl = it->second.at(0);
+        auto first_point_with_different_z_lvl = index_z_lvl_vector.at(0);
         auto first_index = 0;
         z_lvl_type first_z_lvl;
-        if (first_point_with_different_z_lvl.first == first_index) first_z_lvl = first_point_with_different_z_lvl.second;
+        if (first_point_with_different_z_lvl.first == first_index) first_z_lvl =
+                first_point_with_different_z_lvl.second;
         else first_z_lvl = 0;
         process_first_end_point(first_index, first_z_lvl, ogr_ls, z_level_map, node_ref_map);
 
-        auto last_point_with_different_z_lvl = it->second.at(it->second.size() - 1);
+        auto last_point_with_different_z_lvl = index_z_lvl_vector.at(index_z_lvl_vector.size() - 1);
         auto last_index = ogr_ls->getNumPoints() - 1;
         z_lvl_type last_z_lvl;
         if (last_point_with_different_z_lvl.first == last_index) last_z_lvl = last_point_with_different_z_lvl.second;
@@ -620,14 +619,14 @@ void process_way(OGRLineString *ogr_ls, z_lvl_map *z_level_map) {
 
         g_way_buffer.commit();
 
-        bool ferry = is_ferry(get_field_from_feature(g_cur_feat, FERRY));
-        if (ferry) set_ferry_z_lvls_to_zero(it->second);
+        bool ferry = is_ferry(get_field_from_feature(feat, FERRY));
+        if (ferry) set_ferry_z_lvls_to_zero(feat, index_z_lvl_vector);
 
-        split_way_by_z_level(ogr_ls, &it->second, &node_ref_map, link_id);
+        split_way_by_z_level(feat, ogr_ls, index_z_lvl_vector, &node_ref_map, link_id);
     }
 
-    if (!strcmp(get_field_from_feature(g_cur_feat, ADDR_TYPE),"B")){
-        create_house_numbers(ogr_ls);
+    if (!strcmp(get_field_from_feature(feat, ADDR_TYPE), "B")) {
+        create_house_numbers(feat, ogr_ls);
     }
 }
 
@@ -690,7 +689,8 @@ osm_id_vector_type build_admin_boundary_ways(OGRLinearRing* ring) {
 /**
  * \brief adds navteq administrative boundary tags to Relation
  */
-void build_admin_boundary_taglist(osmium::builder::RelationBuilder& builder, ogr_layer_uptr& layer) {
+void build_admin_boundary_taglist(osmium::builder::RelationBuilder& builder, ogr_layer_uptr& layer,
+        ogr_feature_uptr& feat) {
     // Mind tl_builder scope!
     osmium::builder::TagListBuilder tl_builder(g_rel_buffer, &builder);
     tl_builder.add_tag("type", "multipolygon");
@@ -698,7 +698,7 @@ void build_admin_boundary_taglist(osmium::builder::RelationBuilder& builder, ogr
     for (int i = 0; i < layer->GetLayerDefn()->GetFieldCount(); i++) {
         OGRFieldDefn* po_field_defn = layer->GetLayerDefn()->GetFieldDefn(i);
         const char* field_name = po_field_defn->GetNameRef();
-        const char* field_value = g_cur_feat->GetFieldAsString(i);
+        const char* field_value = feat->GetFieldAsString(i);
         // admin boundary mapping: see NAVSTREETS Street Data Reference Manual: p.947)
         if (!strcmp(field_name, "AREA_ID")) {
             osmium::unsigned_object_id_type area_id = std::stoi(field_value);
@@ -730,13 +730,13 @@ void build_relation_members(osmium::builder::RelationBuilder& builder, const osm
         rml_builder.add_member(osmium::item_type::way, osm_id, "inner");
 }
 
-osmium::unsigned_object_id_type build_admin_boundary_relation_with_tags(osm_id_vector_type ext_osm_way_ids,
-        osm_id_vector_type int_osm_way_ids, ogr_layer_uptr& layer) {
+osmium::unsigned_object_id_type build_admin_boundary_relation_with_tags(ogr_layer_uptr& layer, ogr_feature_uptr& feat,
+        osm_id_vector_type ext_osm_way_ids, osm_id_vector_type int_osm_way_ids) {
     osmium::builder::RelationBuilder builder(g_rel_buffer);
     STATIC_RELATION(builder.object()).set_id(g_osm_id++);
     set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
     builder.add_user(USER);
-    build_admin_boundary_taglist(builder, layer);
+    build_admin_boundary_taglist(builder, layer, feat);
     build_relation_members(builder, ext_osm_way_ids, int_osm_way_ids);
     return STATIC_RELATION(builder.object()).id();
 }
@@ -747,14 +747,14 @@ osmium::unsigned_object_id_type build_admin_boundary_relation_with_tags(osm_id_v
 void create_admin_boundary_member(OGRMultiPolygon* mp, osm_id_vector_type& mp_ext_ring_osm_ids,
         osm_id_vector_type& mp_int_ring_osm_ids) {
 
-    for (int i = 0; i < mp->getNumGeometries(); i++){
+    for (int i = 0; i < mp->getNumGeometries(); i++) {
         OGRPolygon* poly = static_cast<OGRPolygon*>(mp->getGeometryRef(i));
 
         osm_id_vector_type exterior_way_ids = build_admin_boundary_ways(poly->getExteriorRing());
         // append osm_way_ids to relation_member_ids
         std::move(exterior_way_ids.begin(), exterior_way_ids.end(), std::back_inserter(mp_ext_ring_osm_ids));
 
-        for (int i=0; i<poly->getNumInteriorRings(); i++){
+        for (int i = 0; i < poly->getNumInteriorRings(); i++) {
             auto interior_way_ids = build_admin_boundary_ways(poly->getInteriorRing(i));
             std::move(interior_way_ids.begin(), interior_way_ids.end(), std::back_inserter(mp_int_ring_osm_ids));
         }
@@ -774,8 +774,8 @@ void create_admin_boundary_member(OGRPolygon* poly, osm_id_vector_type& exterior
 /**
  * \brief adds administrative boundaries as Relations to m_buffer
  */
-void process_admin_boundary(ogr_layer_uptr& layer) {
-    auto geom = g_cur_feat->GetGeometryRef();
+void process_admin_boundary(ogr_layer_uptr& layer, ogr_feature_uptr& feat) {
+    auto geom = feat->GetGeometryRef();
     auto geom_type = geom->getGeometryType();
 
     osm_id_vector_type exterior_way_ids, interior_way_ids;
@@ -785,10 +785,9 @@ void process_admin_boundary(ogr_layer_uptr& layer) {
         create_admin_boundary_member(static_cast<OGRPolygon*>(geom), exterior_way_ids, interior_way_ids);
     } else {
         throw(std::runtime_error(
-                "Adminboundaries with geometry=" + std::string(geom->getGeometryName())
-                        + " are not yet supported."));
+                "Adminboundaries with geometry=" + std::string(geom->getGeometryName()) + " are not yet supported."));
     }
-    build_admin_boundary_relation_with_tags(exterior_way_ids, interior_way_ids, layer);
+    build_admin_boundary_relation_with_tags(layer, feat, exterior_way_ids, interior_way_ids);
 
     g_node_buffer.commit();
     g_way_buffer.commit();
@@ -811,7 +810,7 @@ void process_meta_areas(boost::filesystem::path dir) {
         osmium::unsigned_object_id_type area_id = dbf_get_uint_by_field(handle, i, AREA_ID);
 
         mtd_area_dataset data;
-        if (g_mtd_area_map.find(area_id) != g_mtd_area_map.end()){
+        if (g_mtd_area_map.find(area_id) != g_mtd_area_map.end()) {
             data = g_mtd_area_map.at(area_id);
         }
         data.area_id = area_id;
@@ -834,9 +833,9 @@ void process_meta_areas(boost::filesystem::path dir) {
     DBFClose(handle);
 }
 
-std::vector<link_id_type> collect_via_manoeuvre_link_ids(link_id_type link_id, DBFHandle rdms_handle,
+link_id_vector_type collect_via_manoeuvre_link_ids(link_id_type link_id, DBFHandle rdms_handle,
         cond_id_type cond_id, int& i) {
-    std::vector<link_id_type> via_manoeuvre_link_id;
+    link_id_vector_type via_manoeuvre_link_id;
     via_manoeuvre_link_id.push_back(link_id);
     for (int j = 0;; j++) {
         if (i + j == DBFGetRecordCount(rdms_handle)) {
@@ -853,7 +852,7 @@ std::vector<link_id_type> collect_via_manoeuvre_link_ids(link_id_type link_id, D
     return via_manoeuvre_link_id;
 }
 
-osm_id_vector_type collect_via_manoeuvre_osm_ids(const std::vector<link_id_type>& via_manoeuvre_link_id) {
+osm_id_vector_type collect_via_manoeuvre_osm_ids(const link_id_vector_type& via_manoeuvre_link_id) {
     osm_id_vector_type via_manoeuvre_osm_id;
 
     osmium::Location end_point_front;
@@ -870,15 +869,15 @@ osm_id_vector_type collect_via_manoeuvre_osm_ids(const std::vector<link_id_type>
         auto first_osm_id = osm_id_vector.at(0);
         const auto &first_way = g_way_buffer.get<const osmium::Way>(g_way_offset_map.get(first_osm_id));
         osmium::Location first_way_front = first_way.nodes().front().location();
-        auto last_osm_id = osm_id_vector.at(osm_id_vector.size()-1);
+        auto last_osm_id = osm_id_vector.at(osm_id_vector.size() - 1);
         const auto &last_way = g_way_buffer.get<const osmium::Way>(g_way_offset_map.get(last_osm_id));
         osmium::Location last_way_back = last_way.nodes().back().location();
 
         // determine end_points
-        if (ctr == 0){
+        if (ctr == 0) {
             // assume this is correct
             end_point_front = first_way_front;
-            end_point_back  = last_way_back;
+            end_point_back = last_way_back;
         } else {
             if (ctr == 1) {
                 // checks wether assumption is valid and corrects it if necessary
@@ -892,10 +891,8 @@ osm_id_vector_type collect_via_manoeuvre_osm_ids(const std::vector<link_id_type>
                 }
             }
             // detemine new end_point
-            if (end_point_back == last_way_back)
-                end_point_back = first_way_front;
-            else if (end_point_back == first_way_front)
-                end_point_back = last_way_back;
+            if (end_point_back == last_way_back) end_point_back = first_way_front;
+            else if (end_point_back == first_way_front) end_point_back = last_way_back;
             else assert(false);
         }
 
@@ -905,10 +902,9 @@ osm_id_vector_type collect_via_manoeuvre_osm_ids(const std::vector<link_id_type>
             else
             assert(end_point_back == last_way_back);
         }
-        if (reverse)
-            via_manoeuvre_osm_id.insert(via_manoeuvre_osm_id.end(), osm_id_vector.rbegin(), osm_id_vector.rend());
-        else
-            via_manoeuvre_osm_id.insert(via_manoeuvre_osm_id.end(), osm_id_vector.begin(), osm_id_vector.end());
+        if (reverse) via_manoeuvre_osm_id.insert(via_manoeuvre_osm_id.end(), osm_id_vector.rbegin(),
+                osm_id_vector.rend());
+        else via_manoeuvre_osm_id.insert(via_manoeuvre_osm_id.end(), osm_id_vector.begin(), osm_id_vector.end());
 
         ctr++;
     } // end link_id loop
@@ -1006,16 +1002,17 @@ void init_g_cntry_ref_map(const boost::filesystem::path& dir, std::ostream& out)
 ogr_layer_uptr_vector init_street_layers(const path_vector_type& dirs, std::ostream& out) {
     ogr_layer_uptr_vector layer_vector;
     for (auto dir : dirs) {
-        layer_vector.push_back(ogr_layer_uptr(read_shape_file( dir / STREETS_SHP, out)));
+        layer_vector.push_back(ogr_layer_uptr(read_shape_file(dir / STREETS_SHP, out)));
     }
     return layer_vector;
 }
 
 // \brief stores z_levels in z_level_map for later use. Maps link_ids to pairs of indices and z-levels of waypoints with z-levels not equal 0.
-void init_z_level_map(DBFHandle handle, z_lvl_map& z_level_map) {
+void init_z_level_map(boost::filesystem::path dir, std::ostream& out, z_lvl_map& z_level_map) {
+    DBFHandle handle = read_dbf_file(dir / ZLEVELS_DBF, out);
 
     link_id_type last_link_id;
-    std::vector<std::pair<ushort, z_lvl_type>> v;
+    index_z_lvl_vector_type v;
 
     for (int i = 0; i < DBFGetRecordCount(handle); i++) {
         link_id_type link_id = dbf_get_uint_by_field(handle, i, LINK_ID);
@@ -1025,7 +1022,7 @@ void init_z_level_map(DBFHandle handle, z_lvl_map& z_level_map) {
 
         if (i > 0 && last_link_id != link_id && v.size() > 0) {
             z_level_map.insert(std::make_pair(last_link_id, v));
-            v = std::vector<std::pair<ushort, z_lvl_type>>();
+            v = index_z_lvl_vector_type();
         }
         if (z_level != 0) v.push_back(std::make_pair(point_num, z_level));
         last_link_id = link_id;
@@ -1048,15 +1045,15 @@ void init_country_reference(const boost::filesystem::path& dir, std::ostream& ou
     }
 }
 
-z_lvl_map process_z_levels(path_vector_type dirs, ogr_layer_uptr_vector& layer_vector, std::ostream& out) {
+z_lvl_map process_z_levels(const path_vector_type& dirs, ogr_layer_uptr_vector& layer_vector, std::ostream& out) {
+    assert(layer_vector.size() == dirs.size());
     z_lvl_map z_level_map;
     for (int i = 0; i < layer_vector.size(); i++) {
         boost::filesystem::path dir = dirs.at(i);
         auto& layer = layer_vector.at(i);
         assert(layer->GetGeomType() == wkbLineString);
-//        g_cur_layer = layer;
 
-        init_z_level_map(read_dbf_file(dir / ZLEVELS_DBF, out), z_level_map);
+        init_z_level_map(dir, out, z_level_map);
         init_conditional_driving_manoeuvres(dir, out);
         init_country_reference(dir, out);
     }
@@ -1067,12 +1064,15 @@ void process_way_end_nodes(ogr_layer_uptr_vector& layer_vector, z_lvl_map& z_lev
     for (int i = 0; i < layer_vector.size(); i++) {
         auto& layer = layer_vector.at(i);
         // get all nodes which may be a routable crossing
-        while ((g_cur_feat = layer->GetNextFeature()) != NULL) {
-            link_id_type link_id = get_uint_from_feature(g_cur_feat, LINK_ID);
+
+        int feature_count = layer->GetFeatureCount(false);
+        assert(feature_count >= 0);
+        for (auto i = 0; i < feature_count; i++) {
+            auto&& feat = ogr_feature_uptr(layer->GetFeature(i));
+            link_id_type link_id = get_uint_from_feature(feat, LINK_ID);
             // omit way end nodes with different z-levels (they have to be handled extra)
             if (z_level_map.find(link_id) == z_level_map.end())
-                process_way_end_nodes(static_cast<OGRLineString*>(g_cur_feat->GetGeometryRef()));
-            delete g_cur_feat;
+                process_way_end_nodes(static_cast<OGRLineString*>(feat->GetGeometryRef()));
         }
         g_node_buffer.commit();
         g_way_buffer.commit();
@@ -1083,9 +1083,11 @@ void process_way_end_nodes(ogr_layer_uptr_vector& layer_vector, z_lvl_map& z_lev
 void process_way(ogr_layer_uptr_vector& layer_vector, z_lvl_map& z_level_map) {
     for (int i = 0; i < layer_vector.size(); i++) {
         auto& layer = layer_vector.at(i);
-        while ((g_cur_feat = layer->GetNextFeature()) != NULL) {
-            process_way(static_cast<OGRLineString*>(g_cur_feat->GetGeometryRef()), &z_level_map);
-            delete g_cur_feat;
+        int feature_count = layer->GetFeatureCount(false);
+        assert(feature_count >= 0);
+        for (auto i = 0; i < feature_count; i++) {
+            auto&& feat = ogr_feature_uptr(layer->GetFeature(i));
+            process_way(feat, &z_level_map);
         }
     }
 }
@@ -1116,15 +1118,13 @@ void add_street_shapes(path_vector_type dirs, bool test = false) {
     process_way(layer_vector, z_level_map);
 
     out << " clean" << std::endl;
-//    for (OGRLayer* layer : layer_vector)
-//        delete layer;
     for (auto elem : z_level_map)
         elem.second.clear();
     z_level_map.clear();
 }
 
 void add_street_shapes(boost::filesystem::path dir, bool test = false) {
-    std::vector<boost::filesystem::path> dir_vector;
+    path_vector_type dir_vector;
     dir_vector.push_back(dir);
     add_street_shapes(dir_vector, test);
 }
@@ -1139,9 +1139,11 @@ void add_admin_shape(boost::filesystem::path admin_shape_file, bool test = false
     ogr_layer_uptr layer(read_shape_file(admin_shape_file));
     assert(layer->GetGeomType() == wkbPolygon);
 
-    while ((g_cur_feat = layer->GetNextFeature()) != NULL) {
-        process_admin_boundary(layer);
-        delete g_cur_feat;
+    int feature_count = layer->GetFeatureCount(false);
+    assert(feature_count >= 0);
+    for (auto i = 0; i < feature_count; i++) {
+        auto&& feat = ogr_feature_uptr(layer->GetFeature(i));
+        process_admin_boundary(layer, feat);
     }
 }
 

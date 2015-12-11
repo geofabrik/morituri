@@ -4,7 +4,7 @@
 #include <iostream>
 #include <fstream>
 
-#include "util.hpp"
+#include "navteq_util.hpp"
 #include "navteq_mappings.hpp"
 #include "navteq_types.hpp"
 
@@ -56,7 +56,7 @@ void add_one_way_tag(osmium::builder::TagListBuilder* builder, const char* value
     if (parsed_value) builder->add_tag(one_way, parsed_value);
 }
 
-void add_access_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f) {
+void add_access_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f) {
     if (! parse_bool(get_field_from_feature(f, AR_AUTO))) builder->add_tag("motorcar",  NO);
     if (! parse_bool(get_field_from_feature(f, AR_BUS))) builder->add_tag("bus",  NO);
     if (! parse_bool(get_field_from_feature(f, AR_TAXIS))) builder->add_tag("taxi",  NO);
@@ -120,7 +120,7 @@ std::string to_camel_case_with_spaces(const char* camel) {
 /**
  * \brief adds maxspeed tag
  */
-void add_maxspeed_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f) {
+void add_maxspeed_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f) {
     const char* from_speed_limit_s = strdup(get_field_from_feature(f, FR_SPEED_LIMIT));
     const char* to_speed_limit_s = strdup(get_field_from_feature(f, TO_SPEED_LIMIT));
 
@@ -162,7 +162,7 @@ void add_maxspeed_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f) 
 /**
  * \brief adds here:speed_cat tag
  */
-void add_here_speed_cat_tag(osmium::builder::TagListBuilder* builder, OGRFeature* f) {
+void add_here_speed_cat_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f) {
     auto speed_cat = get_uint_from_feature(f, SPEED_CAT);
     if (0 < speed_cat && speed_cat < (sizeof(speed_cat_metric) / sizeof(const char*))) builder->add_tag(
             "here:speed_cat", speed_cat_metric[speed_cat]);
@@ -233,7 +233,7 @@ bool is_ferry(const char* value) {
     throw(format_error("value '" + std::string(value) + "' for " + std::string(FERRY) + " not valid"));
 }
 
-bool only_pedestrians(OGRFeature* f) {
+bool only_pedestrians(ogr_feature_uptr& f) {
     if (strcmp(get_field_from_feature(f, AR_PEDESTRIANS), "Y")) return false;
     if (! strcmp(get_field_from_feature(f, AR_AUTO),"Y")) return false;
     if (! strcmp(get_field_from_feature(f, AR_BUS),"Y")) return false;
@@ -245,7 +245,7 @@ bool only_pedestrians(OGRFeature* f) {
     return true;
 }
 
-void add_ferry_tag(osmium::builder::TagListBuilder* builder, OGRFeature* f) {
+void add_ferry_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f) {
     const char* ferry = get_field_from_feature(f, FERRY);
     builder->add_tag("route", "ferry");
     if (!strcmp(ferry, "B")) {
@@ -261,12 +261,12 @@ void add_ferry_tag(osmium::builder::TagListBuilder* builder, OGRFeature* f) {
     } else throw(format_error("value '" + std::string(ferry) + "' for " + std::string(FERRY) + " not valid"));
 }
 
-void add_lanes_tag(osmium::builder::TagListBuilder* builder, OGRFeature* f) {
+void add_lanes_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f) {
     const char* number_of_physical_lanes = get_field_from_feature(f, PHYS_LANES);
     if (strcmp(number_of_physical_lanes, "0")) builder->add_tag("lanes", number_of_physical_lanes);
 }
 
-void add_highway_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f, link_id_type link_id,
+void add_highway_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f, link_id_type link_id,
         cdms_map_type* cdms_map, cnd_mod_map_type* cnd_mod_map) {
     add_highway_tag(builder, get_field_from_feature(f, FUNC_CLASS));
     add_one_way_tag(builder, get_field_from_feature(f, DIR_TRAVEL));
@@ -286,7 +286,7 @@ void add_highway_tags(osmium::builder::TagListBuilder* builder, OGRFeature* f, l
  * \brief maps navteq tags for access, tunnel, bridge, etc. to osm tags
  * \return link id of processed feature.
  */
-link_id_type parse_street_tags(osmium::builder::TagListBuilder *builder, OGRFeature* f, cdms_map_type* cdms_map =
+link_id_type parse_street_tags(osmium::builder::TagListBuilder *builder, ogr_feature_uptr& f, cdms_map_type* cdms_map =
         nullptr, cnd_mod_map_type* cnd_mod_map = nullptr, area_id_govt_code_map_type* area_govt_map = nullptr,
         cntry_ref_map_type* cntry_map = nullptr) {
     const char* link_id_s = get_field_from_feature(f, LINK_ID);

@@ -131,6 +131,7 @@ const char* get_field_from_feature(OGRFeature* feat, const char* field) {
     return feat->GetFieldAsString(field_index);
 }
 
+
 /**
  * \brief returns field from OGRFeature
  *        throws exception if field_value is not

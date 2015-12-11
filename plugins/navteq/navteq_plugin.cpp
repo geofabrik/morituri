@@ -13,8 +13,8 @@
 #include <boost/filesystem/path.hpp>
 
 #include "navteq_plugin.hpp"
+#include "navteq_util.hpp"
 #include "navteq.hpp"
-#include "../util.hpp"
 
 /*
 

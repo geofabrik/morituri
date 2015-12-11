@@ -13,6 +13,7 @@
 #include <osmium/osm/location.hpp>
 #include <osmium/osm/types.hpp>
 #include <boost/filesystem/path.hpp>
+#include <gdal/ogrsf_frmts.h>
 
 typedef std::vector<boost::filesystem::path> path_vector_type;
 
@@ -85,8 +86,10 @@ typedef std::vector<link_id_type> link_id_vector_type;
 // type of z-levels (range -4 to +5)
 typedef short z_lvl_type;
 
+typedef std::pair<ushort, z_lvl_type> index_z_lvl_pair_type;
+typedef std::vector<index_z_lvl_pair_type> index_z_lvl_vector_type;
 // maps navteq link_ids to pairs of <index, z_lvl>
-typedef std::map<link_id_type, std::vector<std::pair<ushort, z_lvl_type>>>z_lvl_map;
+typedef std::map<link_id_type, index_z_lvl_vector_type> z_lvl_map;
 
 // pair [Location, z_level] identifies nodes precisely
 typedef std::pair<osmium::Location, z_lvl_type> node_id_type;
@@ -96,6 +99,7 @@ typedef std::map<node_id_type, osmium::unsigned_object_id_type> z_lvl_nodes_map_
 
 typedef osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, size_t> osm_id_to_offset_map_type;
 
+typedef std::unique_ptr<OGRFeature> ogr_feature_uptr;
 typedef std::unique_ptr<OGRLayer> ogr_layer_uptr;
 typedef std::vector<ogr_layer_uptr> ogr_layer_uptr_vector;
 
