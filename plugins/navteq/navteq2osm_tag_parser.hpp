@@ -200,7 +200,9 @@ void add_additional_restrictions(osmium::builder::TagListBuilder* builder, link_
 
     // default is metric units
     bool imperial_units = false;
-    if (area_govt_map && cntry_map) imperial_units = is_imperial(l_area_id, r_area_id, area_govt_map, cntry_map);
+    if (area_govt_map && cntry_map ){
+        imperial_units = is_imperial(l_area_id, r_area_id, area_govt_map, cntry_map);
+    }
 
     auto range = cdms_map->equal_range(link_id);
     for (auto it = range.first; it != range.second; ++it) {

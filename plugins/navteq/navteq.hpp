@@ -94,14 +94,14 @@ void set_dummy_osm_object_attributes(osmium::OSMObject& obj) {
  * \param rml_builder relation member list builder of turn restriction
  */
 
-void add_common_node_as_via(osm_id_vector_type* osm_ids, osmium::builder::RelationMemberListBuilder& rml_builder) {
-    assert(osm_ids->size() == 2);
+void add_common_node_as_via(const osm_id_vector_type& osm_ids, osmium::builder::RelationMemberListBuilder& rml_builder) {
+    assert(osm_ids.size() == 2);
 
-    const osmium::Way &from_way = g_way_buffer.get<const osmium::Way>(g_way_offset_map.get(osm_ids->at(0)));
+    const osmium::Way &from_way = g_way_buffer.get<const osmium::Way>(g_way_offset_map.get(osm_ids.at(0)));
     auto from_way_front = from_way.nodes().front().location();
     auto from_way_back = from_way.nodes().back().location();
 
-    const osmium::Way &to_way = g_way_buffer.get<const osmium::Way>(g_way_offset_map.get(osm_ids->at(1)));
+    const osmium::Way &to_way = g_way_buffer.get<const osmium::Way>(g_way_offset_map.get(osm_ids.at(1)));
     auto to_way_front = to_way.nodes().front().location();
     auto to_way_back = to_way.nodes().back().location();
 
@@ -141,7 +141,7 @@ void add_common_node_as_via(osm_id_vector_type* osm_ids, osmium::builder::Relati
  * \param osm_ids vector with osm_ids of ways which belong to the turn restriction
  * \return Last number of committed bytes to m_buffer before this commit.
  */
-size_t build_turn_restriction(osm_id_vector_type *osm_ids) {
+size_t build_turn_restriction(const osm_id_vector_type& osm_ids) {
 
     osmium::builder::RelationBuilder builder(g_rel_buffer);
     STATIC_RELATION(builder.object()).set_id(std::to_string(g_osm_id++).c_str());
@@ -151,13 +151,13 @@ size_t build_turn_restriction(osm_id_vector_type *osm_ids) {
     {
         osmium::builder::RelationMemberListBuilder rml_builder(g_rel_buffer, &builder);
 
-        assert(osm_ids->size() >= 2);
+        assert(osm_ids.size() >= 2);
 
-        rml_builder.add_member(osmium::item_type::way, osm_ids->at(0), "from");
-        for (int i = 1; i < osm_ids->size() - 1; i++)
-            rml_builder.add_member(osmium::item_type::way, osm_ids->at(i), "via");
-        if (osm_ids->size() == 2) add_common_node_as_via(osm_ids, rml_builder);
-        rml_builder.add_member(osmium::item_type::way, osm_ids->at(osm_ids->size() - 1), "to");
+        rml_builder.add_member(osmium::item_type::way, osm_ids.at(0), "from");
+        for (int i = 1; i < osm_ids.size() - 1; i++)
+            rml_builder.add_member(osmium::item_type::way, osm_ids.at(i), "via");
+        if (osm_ids.size() == 2) add_common_node_as_via(osm_ids, rml_builder);
+        rml_builder.add_member(osmium::item_type::way, osm_ids.at(osm_ids.size() - 1), "to");
 
         osmium::builder::TagListBuilder tl_builder(g_rel_buffer, &builder);
         // todo get the correct direction of the turn restriction
@@ -259,7 +259,7 @@ void test__z_lvl_range(short z_lvl) {
  * \param z_lvl z-level of way. initially invalid (-5).
  * \return id of created Way.
  */
-osmium::unsigned_object_id_type build_way(ogr_feature_uptr& feat, OGRLineString* ogr_ls, node_map_type *node_ref_map =
+osmium::unsigned_object_id_type build_way(ogr_feature_uptr& feat, ogr_line_string_uptr& ogr_ls, node_map_type *node_ref_map =
         nullptr, bool is_sub_linestring = false, short z_lvl = -5) {
 
     if (is_sub_linestring) test__z_lvl_range(z_lvl);
@@ -305,11 +305,11 @@ osmium::unsigned_object_id_type build_way(ogr_feature_uptr& feat, OGRLineString*
  * \param end_index Node index in ogr_ls, where sublinestring will end.
  * \return sublinestring from ogr_ls [start_index, end_index] inclusive
  */
-OGRLineString create_sublinestring_geometry(OGRLineString* ogr_ls, int start_index, int end_index = -1) {
+OGRLineString create_sublinestring_geometry(ogr_line_string_uptr& ogr_ls, int start_index, int end_index = -1) {
     assert(start_index < end_index || end_index == -1);
     assert(start_index < ogr_ls->getNumPoints());
     OGRLineString ogr_sub_ls;
-    ogr_sub_ls.addSubLineString(ogr_ls, start_index, end_index);
+    ogr_sub_ls.addSubLineString(ogr_ls.get(), start_index, end_index);
     return ogr_sub_ls;
 }
 
@@ -344,10 +344,11 @@ bool is_superior_or_equal(short superior, short than) {
  * \param node_ref_map provides osm_ids of Nodes to a given location.
  * \param z_lvl
  */
-void build_sub_way_by_index(ogr_feature_uptr& feat, ushort start_index, ushort end_index, OGRLineString* ogr_ls,
+void build_sub_way_by_index(ogr_feature_uptr& feat, ogr_line_string_uptr& ogr_ls, ushort start_index, ushort end_index,
         node_map_type* node_ref_map, short z_lvl = 0) {
-    OGRLineString ogr_sub_ls = create_sublinestring_geometry(ogr_ls, start_index, end_index);
-    osmium::unsigned_object_id_type way_id = build_way(feat, &ogr_sub_ls, node_ref_map, true, z_lvl);
+    ogr_line_string_uptr ogr_sub_ls_uptr(
+            new OGRLineString(create_sublinestring_geometry(ogr_ls, start_index, end_index)));
+    osmium::unsigned_object_id_type way_id = build_way(feat, ogr_sub_ls_uptr, node_ref_map, true, z_lvl);
 
     g_way_offset_map.set(way_id, g_way_buffer.commit());
 }
@@ -363,8 +364,8 @@ void build_sub_way_by_index(ogr_feature_uptr& feat, ushort start_index, ushort e
  * \param node_ref_map location to osm_id mapping (to preserve uniqueness of node locations)
  * \return start_index
  */
-ushort create_continuing_sub_ways(ogr_feature_uptr& feat, ushort first_index, ushort start_index, ushort last_index,
-        uint link_id, const index_z_lvl_vector_type& node_z_level_vector, OGRLineString* ogr_ls,
+ushort create_continuing_sub_ways(ogr_feature_uptr& feat, ogr_line_string_uptr& ogr_ls, ushort first_index, ushort start_index, ushort last_index,
+        uint link_id, const index_z_lvl_vector_type& node_z_level_vector,
         node_map_type* node_ref_map) {
 
     for (auto it = node_z_level_vector.cbegin(); it != node_z_level_vector.cend(); ++it) {
@@ -413,12 +414,12 @@ ushort create_continuing_sub_ways(ogr_feature_uptr& feat, ushort first_index, us
                 std::cout << " 2 ## " << link_id << " ## " << from << "/" << last_index << "  -  " << to << "/"
                         << last_index << ": \tz_lvl=" << z_lvl << std::endl;
             if (from < to) {
-                build_sub_way_by_index(feat, from, to, ogr_ls, node_ref_map, z_lvl);
+                build_sub_way_by_index(feat, ogr_ls, from, to, node_ref_map, z_lvl);
                 start_index = to;
             }
 
             if (not_last_element && to < next_index - 1) {
-                build_sub_way_by_index(feat, to, next_index - 1, ogr_ls, node_ref_map);
+                build_sub_way_by_index(feat, ogr_ls, to, next_index - 1, node_ref_map);
                 if (DEBUG)
                     std::cout << " 3 ## " << link_id << " ## " << to << "/" << last_index << "  -  " << next_index - 1
                             << "/" << last_index << ": \tz_lvl=" << 0 << std::endl;
@@ -437,7 +438,7 @@ ushort create_continuing_sub_ways(ogr_feature_uptr& feat, ushort first_index, us
  * \param node_ref_map provides osm_ids of Nodes to a given location.
  * \param link_id link_id of processed feature - for debug only.
  */
-void split_way_by_z_level(ogr_feature_uptr& feat, OGRLineString* ogr_ls,
+void split_way_by_z_level(ogr_feature_uptr& feat, ogr_line_string_uptr& ogr_ls,
         const index_z_lvl_vector_type& node_z_level_vector, node_map_type *node_ref_map, uint link_id) {
 
     ushort first_index = 0, last_index = ogr_ls->getNumPoints() - 1;
@@ -450,17 +451,17 @@ void split_way_by_z_level(ogr_feature_uptr& feat, OGRLineString* ogr_ls,
 
 //	if (DEBUG) print_z_level_map(link_id, true);
     if (first_index != start_index) {
-        build_sub_way_by_index(feat, first_index, start_index, ogr_ls, node_ref_map);
+        build_sub_way_by_index(feat, ogr_ls, first_index, start_index, node_ref_map);
         if (DEBUG)
             std::cout << " 1 ## " << link_id << " ## " << first_index << "/" << last_index << "  -  " << start_index
                     << "/" << last_index << ": \tz_lvl=" << 0 << std::endl;
     }
 
-    start_index = create_continuing_sub_ways(feat, first_index, start_index, last_index, link_id, node_z_level_vector,
-            ogr_ls, node_ref_map);
+    start_index = create_continuing_sub_ways(feat, ogr_ls, first_index, start_index, last_index, link_id, node_z_level_vector,
+            node_ref_map);
 
     if (start_index < last_index) {
-        build_sub_way_by_index(feat, start_index, last_index, ogr_ls, node_ref_map);
+        build_sub_way_by_index(feat, ogr_ls, start_index, last_index, node_ref_map);
         if (DEBUG)
             std::cout << " 4 ## " << link_id << " ## " << start_index << "/" << last_index << "  -  " << last_index
                     << "/" << last_index << ": \tz_lvl=" << 0 << std::endl;
@@ -476,8 +477,8 @@ void split_way_by_z_level(ogr_feature_uptr& feat, OGRLineString* ogr_ls,
  * \brief determines osm_id for end_point. If it doesn't exist it will be created.
  */
 
-void process_end_point(bool first, ushort index, z_lvl_type z_lvl, OGRLineString *ogr_ls, z_lvl_map *z_level_map,
-        node_map_type & node_ref_map) {
+void process_end_point(bool first, ushort index, z_lvl_type z_lvl, ogr_line_string_uptr& ogr_ls, z_lvl_map *z_level_map,
+        node_map_type& node_ref_map) {
     ushort i = first ? 0 : ogr_ls->getNumPoints() - 1;
     osmium::Location location(ogr_ls->getX(i), ogr_ls->getY(i));
 
@@ -498,17 +499,17 @@ void process_end_point(bool first, ushort index, z_lvl_type z_lvl, OGRLineString
     }
 }
 
-void process_first_end_point(ushort index, z_lvl_type z_lvl, OGRLineString *ogr_ls, z_lvl_map *z_level_map,
+void process_first_end_point(ushort index, z_lvl_type z_lvl, ogr_line_string_uptr& ogr_ls, z_lvl_map *z_level_map,
         node_map_type & node_ref_map) {
     process_end_point(true, index, z_lvl, ogr_ls, z_level_map, node_ref_map);
 }
 
-void process_last_end_point(ushort index, z_lvl_type z_lvl, OGRLineString *ogr_ls, z_lvl_map *z_level_map,
+void process_last_end_point(ushort index, z_lvl_type z_lvl, ogr_line_string_uptr& ogr_ls, z_lvl_map *z_level_map,
         node_map_type & node_ref_map) {
     process_end_point(false, index, z_lvl, ogr_ls, z_level_map, node_ref_map);
 }
 
-void middle_points_preparation(OGRLineString* ogr_ls, node_map_type& node_ref_map) {
+void middle_points_preparation(ogr_line_string_uptr& ogr_ls, node_map_type& node_ref_map) {
     // creates remaining nodes required for way
     for (int i = 1; i < ogr_ls->getNumPoints() - 1; i++) {
         osmium::Location location(ogr_ls->getX(i), ogr_ls->getY(i));
@@ -532,7 +533,7 @@ void set_ferry_z_lvls_to_zero(ogr_feature_uptr& feat, index_z_lvl_vector_type& z
         z_lvl_vec.erase(z_lvl_vec.end());
 }
 
-void create_house_numbers(ogr_feature_uptr& feat, OGRLineString* ogr_ls, bool left) {
+void create_house_numbers(ogr_feature_uptr& feat, ogr_line_string_uptr& ogr_ls, bool left) {
     const char* ref_addr = left ? L_REFADDR : R_REFADDR;
     const char* nref_addr = left ? L_NREFADDR : R_NREFADDR;
     const char* addr_schema = left ? L_ADDRSCH : R_ADDRSCH;
@@ -542,8 +543,8 @@ void create_house_numbers(ogr_feature_uptr& feat, OGRLineString* ogr_ls, bool le
     if (!strcmp(get_field_from_feature(feat, addr_schema), "")) return;
     if (!strcmp(get_field_from_feature(feat, addr_schema), "M")) return;
 
-    OGRLineString* offset_ogr_ls = create_offset_curve(ogr_ls, 0.00005, left);
-
+    ogr_line_string_uptr offset_ogr_ls(create_offset_curve(ogr_ls.get(), 0.00005, left));
+    assert(ogr_ls);
     osmium::builder::WayBuilder way_builder(g_way_buffer);
     STATIC_WAY(way_builder.object()).set_id(g_osm_id++);
     set_dummy_osm_object_attributes(STATIC_OSMOBJECT(way_builder.object()));
@@ -572,7 +573,7 @@ void create_house_numbers(ogr_feature_uptr& feat, OGRLineString* ogr_ls, bool le
     g_way_buffer.commit();
 }
 
-void create_house_numbers(ogr_feature_uptr& feat, OGRLineString* ogr_ls) {
+void create_house_numbers(ogr_feature_uptr& feat, ogr_line_string_uptr& ogr_ls) {
     create_house_numbers(feat, ogr_ls, true);
     create_house_numbers(feat, ogr_ls, false);
 }
@@ -583,11 +584,13 @@ void create_house_numbers(ogr_feature_uptr& feat, OGRLineString* ogr_ls) {
  * \param ogr_ls linestring which provides the geometry.
  * \param z_level_map holds z_levels to Nodes of Ways.
  */
-void process_way(ogr_feature_uptr& feat, z_lvl_map *z_level_map) {
+void process_way(ogr_feature_uptr&& feat, z_lvl_map *z_level_map) {
 
     node_map_type node_ref_map;
 
-    OGRLineString *ogr_ls = static_cast<OGRLineString*>(feat->GetGeometryRef());
+    // caution! ogr_ls refers to a geometry which is part of feat => you mustn't cleanup
+    ogr_line_string_uptr ogr_ls(static_cast<OGRLineString*>(feat->GetGeometryRef()));
+
     // creates remaining nodes required for way
     middle_points_preparation(ogr_ls, node_ref_map);
     if (ogr_ls->getNumPoints() > 2) assert(node_ref_map.size() > 0);
@@ -628,6 +631,8 @@ void process_way(ogr_feature_uptr& feat, z_lvl_map *z_level_map) {
     if (!strcmp(get_field_from_feature(feat, ADDR_TYPE), "B")) {
         create_house_numbers(feat, ogr_ls);
     }
+    // ogr_ls will be cleaned alongside with feat
+    ogr_ls.release();
 }
 
 // \brief writes way end node to way_end_points_map.
@@ -744,7 +749,7 @@ osmium::unsigned_object_id_type build_admin_boundary_relation_with_tags(ogr_laye
 /**
  * \brief handles administrative boundary multipolygons
  */
-void create_admin_boundary_member(OGRMultiPolygon* mp, osm_id_vector_type& mp_ext_ring_osm_ids,
+void create_admin_boundary_member(ogr_multi_polygon_uptr&& mp, osm_id_vector_type& mp_ext_ring_osm_ids,
         osm_id_vector_type& mp_int_ring_osm_ids) {
 
     for (int i = 0; i < mp->getNumGeometries(); i++) {
@@ -761,7 +766,7 @@ void create_admin_boundary_member(OGRMultiPolygon* mp, osm_id_vector_type& mp_ex
     }
 }
 
-void create_admin_boundary_member(OGRPolygon* poly, osm_id_vector_type& exterior_way_ids,
+void create_admin_boundary_member(ogr_polygon_uptr&& poly, osm_id_vector_type& exterior_way_ids,
         osm_id_vector_type& interior_way_ids) {
     exterior_way_ids = build_admin_boundary_ways(poly->getExteriorRing());
 
@@ -775,14 +780,17 @@ void create_admin_boundary_member(OGRPolygon* poly, osm_id_vector_type& exterior
  * \brief adds administrative boundaries as Relations to m_buffer
  */
 void process_admin_boundary(ogr_layer_uptr& layer, ogr_feature_uptr& feat) {
-    auto geom = feat->GetGeometryRef();
+    ogr_geometry_uptr geom(feat->GetGeometryRef());
     auto geom_type = geom->getGeometryType();
 
     osm_id_vector_type exterior_way_ids, interior_way_ids;
     if (geom_type == wkbMultiPolygon) {
-        create_admin_boundary_member(static_cast<OGRMultiPolygon*>(geom), exterior_way_ids, interior_way_ids);
+        create_admin_boundary_member(ogr_multi_polygon_uptr(static_cast<OGRMultiPolygon*>(geom.release())),
+                exterior_way_ids, interior_way_ids);
+
     } else if (geom_type == wkbPolygon) {
-        create_admin_boundary_member(static_cast<OGRPolygon*>(geom), exterior_way_ids, interior_way_ids);
+        create_admin_boundary_member(ogr_polygon_uptr(static_cast<OGRPolygon*>(geom.release())), exterior_way_ids,
+                interior_way_ids);
     } else {
         throw(std::runtime_error(
                 "Adminboundaries with geometry=" + std::string(geom->getGeometryName()) + " are not yet supported."));
@@ -792,6 +800,7 @@ void process_admin_boundary(ogr_layer_uptr& layer, ogr_feature_uptr& feat) {
     g_node_buffer.commit();
     g_way_buffer.commit();
     g_rel_buffer.commit();
+    geom.release();
 }
 
 /**
@@ -949,7 +958,7 @@ void add_turn_restrictions(path_vector_type dirs) {
             if (via_manoeuvre_osm_id.empty()) continue;
 
             // todo find out which direction turn restriction has and apply. For now: always apply 'no_straight_on'
-            build_turn_restriction(&via_manoeuvre_osm_id);
+            build_turn_restriction(via_manoeuvre_osm_id);
         }
     }
 }
@@ -1067,8 +1076,8 @@ void process_way_end_nodes(ogr_layer_uptr_vector& layer_vector, z_lvl_map& z_lev
 
         int feature_count = layer->GetFeatureCount(false);
         assert(feature_count >= 0);
-        for (auto i = 0; i < feature_count; i++) {
-            auto&& feat = ogr_feature_uptr(layer->GetFeature(i));
+        for (auto j = 0; j < feature_count; j++) {
+            auto&& feat = ogr_feature_uptr(layer->GetFeature(j));
             link_id_type link_id = get_uint_from_feature(feat, LINK_ID);
             // omit way end nodes with different z-levels (they have to be handled extra)
             if (z_level_map.find(link_id) == z_level_map.end())
@@ -1085,9 +1094,8 @@ void process_way(ogr_layer_uptr_vector& layer_vector, z_lvl_map& z_level_map) {
         auto& layer = layer_vector.at(i);
         int feature_count = layer->GetFeatureCount(false);
         assert(feature_count >= 0);
-        for (auto i = 0; i < feature_count; i++) {
-            auto&& feat = ogr_feature_uptr(layer->GetFeature(i));
-            process_way(feat, &z_level_map);
+        for (auto j = 0; j < feature_count; j++) {
+            process_way(ogr_feature_uptr(layer->GetFeature(j)), &z_level_map);
         }
     }
 }
@@ -1142,8 +1150,9 @@ void add_admin_shape(boost::filesystem::path admin_shape_file, bool test = false
     int feature_count = layer->GetFeatureCount(false);
     assert(feature_count >= 0);
     for (auto i = 0; i < feature_count; i++) {
-        auto&& feat = ogr_feature_uptr(layer->GetFeature(i));
+        ogr_feature_uptr feat(layer->GetFeature(i));
         process_admin_boundary(layer, feat);
+        feat.release();
     }
 }
 
@@ -1167,8 +1176,7 @@ void clear_all() {
 
 void add_buffer_ids(osm_id_vector_type& v, osmium::memory::Buffer& buf) {
     for (auto& it : buf) {
-        osmium::OSMObject* obj = static_cast<osmium::OSMObject*>(&it);
-        v.push_back((osmium::unsigned_object_id_type) (obj->id()));
+        v.push_back(static_cast<osmium::OSMObject*>(&it)->id());
     }
 }
 

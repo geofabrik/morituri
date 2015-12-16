@@ -40,16 +40,17 @@ bool navteq_plugin::is_valid_format(std::string filename) {
 
 bool navteq_plugin::check_files(boost::filesystem::path dir) {
     if (!shp_file_exists(dir / STREETS_SHP)) return false;
-    if (!shp_file_exists(dir / ADMINBNDY_1_SHP)) std::cerr << "  administrative boundaries level 1 are missing\n";
-    if (!shp_file_exists(dir / ADMINBNDY_2_SHP)) std::cerr << "  administrative boundaries level 2 are missing\n";
-    if (!shp_file_exists(dir / ADMINBNDY_3_SHP)) std::cerr << "  administrative boundaries level 3 are missing\n";
-    if (!shp_file_exists(dir / ADMINBNDY_4_SHP)) std::cerr << "  administrative boundaries level 4 are missing\n";
-    if (!shp_file_exists(dir / ADMINBNDY_5_SHP)) std::cerr << "  administrative boundaries level 5 are missing\n";
 
     if (!dbf_file_exists(dir / MTD_AREA_DBF )) return false;
     if (!dbf_file_exists(dir / RDMS_DBF     )) return false;
     if (!dbf_file_exists(dir / CDMS_DBF     )) return false;
     if (!dbf_file_exists(dir / ZLEVELS_DBF  )) return false;
+
+    if (!shp_file_exists(dir / ADMINBNDY_1_SHP)) std::cerr << "  administrative boundaries level 1 are missing\n";
+    if (!shp_file_exists(dir / ADMINBNDY_2_SHP)) std::cerr << "  administrative boundaries level 2 are missing\n";
+    if (!shp_file_exists(dir / ADMINBNDY_3_SHP)) std::cerr << "  administrative boundaries level 3 are missing\n";
+    if (!shp_file_exists(dir / ADMINBNDY_4_SHP)) std::cerr << "  administrative boundaries level 4 are missing\n";
+    if (!shp_file_exists(dir / ADMINBNDY_5_SHP)) std::cerr << "  administrative boundaries level 5 are missing\n";
     return true;
 }
 
