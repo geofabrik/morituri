@@ -70,6 +70,7 @@ If you want to test this program and you don't have data of your own you may get
 * Maperitive
 * osmosis
 * qgis
+* graphhopper
 
 ### Issues:
 ##### Maperitive:
