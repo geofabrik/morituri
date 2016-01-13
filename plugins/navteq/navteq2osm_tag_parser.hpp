@@ -15,10 +15,10 @@ bool parse_bool(const char* value) {
 }
 
 // match 'functional class' to 'highway' tag
-void add_highway_tag(osmium::builder::TagListBuilder* builder, const char* value) {
+void add_highway_tag(osmium::builder::TagListBuilder* builder, uint highway_level) {
     const char* highway = "highway";
 
-    switch (std::stoi(value)) {
+    switch (highway_level) {
         case 1:
             builder->add_tag(highway, "motorway");
             break;
@@ -34,8 +34,11 @@ void add_highway_tag(osmium::builder::TagListBuilder* builder, const char* value
         case 5:
             builder->add_tag(highway, "residential");
             break;
+        case 6:
+            builder->add_tag(highway, "service");
+            break;
         default:
-            throw(format_error("functional class '" + std::string(value) + "' not valid"));
+            std::cerr << "ignoring highway_level'" << std::to_string(highway_level) << "'" << std::endl;
     }
 }
 
@@ -272,7 +275,16 @@ void add_lanes_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f
 
 void add_highway_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f, link_id_type link_id,
         cdms_map_type* cdms_map, cnd_mod_map_type* cnd_mod_map) {
-    add_highway_tag(builder, get_field_from_feature(f, FUNC_CLASS));
+
+    uint highway_level;
+    std::string route_type = get_field_from_feature(f, ROUTE);
+    if (!route_type.empty()){
+        highway_level = get_uint_from_feature(f, ROUTE);
+    } else {
+        highway_level = get_uint_from_feature(f, FUNC_CLASS);
+    }
+
+    add_highway_tag(builder, highway_level);
     add_one_way_tag(builder, get_field_from_feature(f, DIR_TRAVEL));
     add_access_tags(builder, f);
     add_maxspeed_tags(builder, f);
