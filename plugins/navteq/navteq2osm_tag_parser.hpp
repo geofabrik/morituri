@@ -206,13 +206,8 @@ bool is_imperial(area_id_type area_id, area_id_govt_code_map_type* area_govt_map
  */
 bool is_imperial(area_id_type l_area_id, area_id_type r_area_id, area_id_govt_code_map_type* area_govt_map,
         cntry_ref_map_type* cntry_map) {
-
     if (is_imperial(l_area_id, area_govt_map, cntry_map)) return true;
     if (is_imperial(r_area_id, area_govt_map, cntry_map)) return true;
-
-    std::cerr << "Warning: no unit_measure found for area_id=" << std::to_string(l_area_id) << " or area_id="
-            << std::to_string(r_area_id) << ", assuming metric." << std::endl;
-
     return false;
 }
 
