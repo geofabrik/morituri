@@ -83,7 +83,7 @@ doc: ${SOURCE} ${HEADER} Doxyfile
 	doxygen Doxyfile
    
 clean: 
-	rm -f comm2osm test testfiles
+	rm -f comm2osm comm2osm-debug test testfiles
 	rm -rf .tmp_navteq
 	rm -rf doc
 	rm -f tests/navteq_test
