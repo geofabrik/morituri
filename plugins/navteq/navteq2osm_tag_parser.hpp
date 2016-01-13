@@ -338,6 +338,14 @@ link_id_type parse_street_tags(osmium::builder::TagListBuilder *builder, ogr_fea
     add_additional_restrictions(builder, link_id, l_area_id, r_area_id, cdms_map, cnd_mod_map, area_govt_map,
             cntry_map);
     add_here_speed_cat_tag(builder, f);
+    if (parse_bool(get_field_from_feature(f, TOLLWAY))) builder->add_tag("here:tollway", YES);
+    if (parse_bool(get_field_from_feature(f, URBAN))) builder->add_tag("here:urban", YES);
+    std::string route_type = get_field_from_feature(f, ROUTE);
+    if (!route_type.empty()) builder->add_tag("here:route_type", route_type.c_str());
+
+    std::string func_class = get_field_from_feature(f, FUNC_CLASS);
+    if (!func_class.empty()) builder->add_tag("here:func_class", func_class.c_str());
+
 
     return link_id;
 }

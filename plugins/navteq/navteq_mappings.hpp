@@ -63,6 +63,7 @@ const char* TUNNEL = "TUNNEL";
 const char* TOLLWAY = "TOLLWAY";
 const char* ROUNDABOUT = "ROUNDABOUT";
 const char* FERRY = "FERRY_TYPE";
+const char* URBAN = "URBAN";
 const char* ROUTE = "ROUTE_TYPE";
 const char* FOURWHLDR = "FOURWHLDR";
 const char* PHYS_LANES = "PHYS_LANES";
