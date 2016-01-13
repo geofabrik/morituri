@@ -176,23 +176,44 @@ void add_here_speed_cat_tag(osmium::builder::TagListBuilder* builder, ogr_featur
 
 /**
  * \brief check if unit is imperial. area_id(Streets.dbf) -> govt_id(MtdArea.dbf) -> unit_measure(MtdCntryRef.dbf)
+ * \param area_id area_id
+ * \param area_govt_map maps area_ids to govt_codes
+ * \param cntry_map maps govt_codes to cntry_ref_types
+ * \return returns false if any of the areas contain metric units or if its unclear
+ */
+bool is_imperial(area_id_type area_id, area_id_govt_code_map_type* area_govt_map,
+        cntry_ref_map_type* cntry_map) {
+    if (area_govt_map->find(area_id) != area_govt_map->end()) {
+        if (cntry_map->find(area_govt_map->at(area_id)) != cntry_map->end()) {
+            auto unit_measure = cntry_map->at(area_govt_map->at(area_id)).unit_measure;
+            if (unit_measure == 'E') {
+                return true;
+            } else if (unit_measure != 'M'){
+                format_error("unit_measure in navteq data is invalid: '" + std::to_string(unit_measure) + "'");
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * \brief check if unit is imperial. area_id(Streets.dbf) -> govt_id(MtdArea.dbf) -> unit_measure(MtdCntryRef.dbf)
  * \param l_area_id area_id on the left side of the link
  * \param r_area_id area_id on the right side of the link
  * \param area_govt_map maps area_ids to govt_codes
  * \param cntry_map maps govt_codes to cntry_ref_types
- * \return returns false if any of the areas contain metric units
+ * \return returns false if any of the areas contain metric units or if its unclear
  */
 bool is_imperial(area_id_type l_area_id, area_id_type r_area_id, area_id_govt_code_map_type* area_govt_map,
         cntry_ref_map_type* cntry_map) {
-    if (area_govt_map->find(l_area_id) != area_govt_map->end())
-        if (cntry_map->find(area_govt_map->at(l_area_id)) != cntry_map->end())
-            if (cntry_map->at(area_govt_map->at(l_area_id)).unit_measure == 'M') return false;
 
-    if (area_govt_map->find(r_area_id) != area_govt_map->end())
-        if (cntry_map->find(area_govt_map->at(r_area_id)) != cntry_map->end())
-            if (cntry_map->at(area_govt_map->at(r_area_id)).unit_measure == 'M') return false;
+    if (is_imperial(l_area_id, area_govt_map, cntry_map)) return true;
+    if (is_imperial(r_area_id, area_govt_map, cntry_map)) return true;
 
-    return true;
+    std::cerr << "Warning: no unit_measure found for area_id=" << std::to_string(l_area_id) << " or area_id="
+            << std::to_string(r_area_id) << ", assuming metric." << std::endl;
+
+    return false;
 }
 
 /**
