@@ -65,9 +65,11 @@ void add_access_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr&
     if (! parse_bool(get_field_from_feature(f, AR_TRUCKS))) builder->add_tag("hgv", NO);
     if (! parse_bool(get_field_from_feature(f, AR_EMERVEH))) builder->add_tag("emergency",  NO);
     if (! parse_bool(get_field_from_feature(f, AR_MOTORCYCLES))) builder->add_tag("motorcycle",  NO);
-    if (! parse_bool(get_field_from_feature(f, AR_THROUGH_TRAFFIC))) builder->add_tag("access", "destination");
-    if (! parse_bool(get_field_from_feature(f, PUB_ACCESS)) || parse_bool(get_field_from_feature(f, PRIVATE)))
+    if (!parse_bool(get_field_from_feature(f, PUB_ACCESS)) || parse_bool(get_field_from_feature(f, PRIVATE))){
         builder->add_tag("access", "private");
+    } else if (!parse_bool(get_field_from_feature(f, AR_THROUGH_TRAFFIC))){
+        builder->add_tag("access", "destination");
+    }
 }
 
 /**
