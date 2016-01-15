@@ -25,7 +25,7 @@ private:
 
 public:
 
-    navteq_plugin();
+    navteq_plugin(boost::filesystem::path executable_path);
     virtual ~navteq_plugin();
 
     bool check_input(boost::filesystem::path input_path, boost::filesystem::path output_path =

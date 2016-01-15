@@ -8,6 +8,9 @@
 #include "navteq_mappings.hpp"
 #include "navteq_types.hpp"
 
+boost::filesystem::path g_executable_path;
+const boost::filesystem::path PLUGINS_NAVTEQ_ISO_639_2_UTF_8_TXT("plugins/navteq/ISO-639-2_utf-8.txt");
+
 // helper
 bool parse_bool(const char* value) {
     if (!strcmp(value, "Y")) return true;
@@ -356,7 +359,10 @@ link_id_type parse_street_tags(osmium::builder::TagListBuilder *builder, ogr_fea
 // ISO-639 conversion
 std::map<std::string, std::string> g_lang_code_map;
 void parse_lang_code_file() {
-    std::ifstream file("plugins/navteq/ISO-639-2_utf-8.txt");
+    if(g_executable_path.empty()) throw(std::runtime_error("executable_path is empty"));
+
+    boost::filesystem::path iso_file(g_executable_path/PLUGINS_NAVTEQ_ISO_639_2_UTF_8_TXT);
+    std::ifstream file(iso_file.string());
     assert(file.is_open());
     std::string line;
     std::string delim = "|";

@@ -8,8 +8,7 @@
 #include "dummy_plugin.hpp"
 #include <iostream>
 
-dummy_plugin::dummy_plugin() {
-    name = "Dummy Plugin";
+dummy_plugin::dummy_plugin() : base_plugin::base_plugin("Dummy Plugin") {
 }
 
 dummy_plugin::~dummy_plugin() {

@@ -19,6 +19,18 @@ public:
     const char* name;
     boost::filesystem::path input_path;
     boost::filesystem::path output_path;
+    boost::filesystem::path executable_path;
+
+    base_plugin(){
+        this->name = "";
+    };
+    base_plugin(const char* name){
+        this->name = name;
+    };
+    base_plugin(const char* name, boost::filesystem::path executable_path){
+        this->name = name;
+        this->executable_path = executable_path.parent_path();
+    };
 
     virtual ~base_plugin() {
     }

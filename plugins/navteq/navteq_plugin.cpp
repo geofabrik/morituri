@@ -22,8 +22,10 @@
 
  */
 
-navteq_plugin::navteq_plugin() {
-    name = "Navteq Plugin";
+navteq_plugin::navteq_plugin(boost::filesystem::path executable_path) :
+        base_plugin::base_plugin("Navteq Plugin", executable_path) {
+    // setting executable_path in navteq2osm_tag_parser.hpp for reading ISO-file
+    g_executable_path = this->executable_path;
 }
 
 navteq_plugin::~navteq_plugin() {
@@ -109,6 +111,7 @@ void navteq_plugin::write_output() {
 }
 
 void navteq_plugin::add_administrative_boundaries() {
+
     // todo admin-levels only apply to the US => more generic for all countries
     for (auto dir : dirs){
         process_meta_areas(dir);

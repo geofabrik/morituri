@@ -67,8 +67,10 @@ int main(int argc, char* argv[]) {
 
     std::vector<base_plugin*> plugins;
 
+    boost::filesystem::path executable_path(argv[0]);
+
     plugins.push_back(new dummy_plugin());
-    plugins.push_back(new navteq_plugin());
+    plugins.push_back(new navteq_plugin(executable_path));
 
     for (auto plugin : plugins) {
         if (plugin->check_input(input_path, output_file)) {
