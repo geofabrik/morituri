@@ -50,7 +50,7 @@ osmium::unsigned_object_id_type g_osm_id = 1;
 link_id_map_type g_link_id_map;
 
 // Provides access to elements in g_way_buffer through offsets
-osm_id_to_offset_map_type g_way_offset_map;
+osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, size_t> g_way_offset_map;
 
 // data structure to store admin boundary tags
 struct mtd_area_dataset {
