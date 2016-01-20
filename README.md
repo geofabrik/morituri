@@ -32,15 +32,13 @@ are problematic due to the following reasons:
 * shapelib ([http://download.osgeo.org/shapelib/](http://download.osgeo.org/shapelib/))
 
 ##### For Testing
-* gcc-4.9
+* g++-4.8
 * gdal-bin (for ogr2ogr)
 
 
 #### Ubuntu install instructions: *(tested with 14.04.2 LTS)*
 
 CAUTION: Have a look at `install_prerequisites.sh` before executing it.
-Because gcc-4.9 isn't in Ubuntu 14.04 LTS yet this script adds the apt-repository `ppa:ubuntu-toolchain-r/test`.
-Along with this repository you may get asked to update grub.
  
 Install prerequisits with the `install_prerequisites.sh`. You may have to make this executable 
 (e.g. with `chmod +x install_prerequisites.sh`).
