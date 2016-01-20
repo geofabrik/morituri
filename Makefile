@@ -57,22 +57,22 @@ all: comm2osm-debug comm2osm tests
 .PHONY: all
 
 comm2osm-debug: ${SOURCE} ${HEADER}
-	g++ ${CXXFLAGS} ${DEBUG_FLAGS} -o comm2osm-debug ${SOURCE} ${INCLUDES} ${LIBS}
+	${CXX} ${CXXFLAGS} ${DEBUG_FLAGS} -o comm2osm-debug ${SOURCE} ${INCLUDES} ${LIBS}
 
 comm2osm: ${SOURCE} ${HEADER}
-	g++ ${CXXFLAGS} -o comm2osm ${SOURCE} ${INCLUDES} ${LIBS}
+	${CXX} ${CXXFLAGS} -o comm2osm ${SOURCE} ${INCLUDES} ${LIBS}
 
 tests: tests/navteq_test tests/util_test tests/navteq_unit_test
 .PHONY: tests
 
 tests/navteq_unit_test: ${NAVTEQ_UNIT_TEST_SOURCE} ${NAVTEQ_UNIT_TEST_HEADER}
-	g++ ${CXXFLAGS} ${DEBUG_FLAGS} -o tests/navteq_unit_test ${NAVTEQ_UNIT_TEST_SOURCE} ${INCLUDES} ${LIBS}
+	${CXX} ${CXXFLAGS} ${DEBUG_FLAGS} -o tests/navteq_unit_test ${NAVTEQ_UNIT_TEST_SOURCE} ${INCLUDES} ${LIBS}
 
 tests/navteq_test: ${NAVTEQ_TEST_SOURCE} ${NAVTEQ_TEST_HEADER}
-	g++ ${CXXFLAGS} ${DEBUG_FLAGS} -o tests/navteq_test ${NAVTEQ_TEST_SOURCE} ${INCLUDES} ${LIBS}
+	${CXX} ${CXXFLAGS} ${DEBUG_FLAGS} -o tests/navteq_test ${NAVTEQ_TEST_SOURCE} ${INCLUDES} ${LIBS}
 
 tests/util_test: ${UTIL_TEST_SOURCE} ${UTIL_TEST_HEADER}
-	g++ ${CXXFLAGS} ${DEBUG_FLAGS} -o tests/util_test ${UTIL_TEST_SOURCE} ${INCLUDES} ${LIBS}
+	${CXX} ${CXXFLAGS} ${DEBUG_FLAGS} -o tests/util_test ${UTIL_TEST_SOURCE} ${INCLUDES} ${LIBS}
 
 test:
 	./tests/navteq_unit_test
