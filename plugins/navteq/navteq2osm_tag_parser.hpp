@@ -228,6 +228,8 @@ void add_additional_restrictions(osmium::builder::TagListBuilder* builder, link_
         imperial_units = is_imperial(l_area_id, r_area_id, area_govt_map, cntry_map);
     }
 
+    uint64_t max_height = 0, max_width = 0, max_length = 0, max_weight = 0, max_axleload = 0;
+
     auto range = cdms_map->equal_range(link_id);
     for (auto it = range.first; it != range.second; ++it) {
         cond_id_type cond_id = it->second;
@@ -236,20 +238,30 @@ void add_additional_restrictions(osmium::builder::TagListBuilder* builder, link_
             auto mod_group = it2->second;
             auto mod_type = mod_group.mod_type;
             auto mod_val = mod_group.mod_val;
-
-            if (mod_type == MT_HEIGHT_RESTRICTION) {
-               builder->add_tag("maxheight", imperial_units ? inch_to_feet(mod_val) : cm_to_m(mod_val));
-            } else if (mod_type == MT_WIDTH_RESTRICTION) {
-                builder->add_tag("maxwidth", imperial_units ? inch_to_feet(mod_val) : cm_to_m(mod_val));
-            } else if (mod_type == MT_LENGTH_RESTRICTION) {
-                builder->add_tag("maxlength", imperial_units ? inch_to_feet(mod_val) : cm_to_m(mod_val));
-            } else if (mod_type == MT_WEIGHT_RESTRICTION) {
-                builder->add_tag("maxweight", imperial_units ? lbs_to_metric_ton(mod_val) : kg_to_t(mod_val));
-            } else if (mod_type == MT_WEIGHT_PER_AXLE_RESTRICTION) {
-                builder->add_tag("maxaxleload", imperial_units ? lbs_to_metric_ton(mod_val) : kg_to_t(mod_val));
-            }
+			if (mod_type == MT_HEIGHT_RESTRICTION) {
+				if (!max_height || mod_val < max_height)
+					max_height = mod_val;
+			} else if (mod_type == MT_WIDTH_RESTRICTION) {
+				if (!max_width || mod_val < max_width)
+					max_width = mod_val;
+			} else if (mod_type == MT_LENGTH_RESTRICTION) {
+				if (!max_length || mod_val < max_length)
+					max_length = mod_val;
+			} else if (mod_type == MT_WEIGHT_RESTRICTION) {
+				if (!max_weight || mod_val < max_weight)
+					max_weight = mod_val;
+			} else if (mod_type == MT_WEIGHT_PER_AXLE_RESTRICTION) {
+				if (!max_axleload || mod_val < max_axleload)
+					max_axleload = mod_val;
+			}
         }
     }
+
+	if (max_height > 0) builder->add_tag("maxheight", imperial_units ? inch_to_feet(max_height) : cm_to_m(max_height));
+	if (max_width > 0)  builder->add_tag("maxwidth", imperial_units ? inch_to_feet(max_width) : cm_to_m(max_width));
+	if (max_length > 0)  builder->add_tag("maxlength", imperial_units ? inch_to_feet(max_length) : cm_to_m(max_length));
+	if (max_weight > 0)  builder->add_tag("maxweight", imperial_units ? lbs_to_metric_ton(max_weight) : kg_to_t(max_weight));
+	if (max_axleload > 0)  builder->add_tag("maxaxleload", imperial_units ? lbs_to_metric_ton(max_axleload) : kg_to_t(max_axleload));
 }
 
 bool is_ferry(const char* value) {
