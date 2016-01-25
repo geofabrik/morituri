@@ -70,6 +70,8 @@ const char* PHYS_LANES = "PHYS_LANES";
 const char* PUB_ACCESS = "PUB_ACCESS";
 const char* L_AREA_ID = "L_AREA_ID";
 const char* R_AREA_ID = "R_AREA_ID";
+const char* L_POSTCODE = "L_POSTCODE";
+const char* R_POSTCODE = "R_POSTCODE";
 
 // MTD_AREA_DBF columns
 const char* AREA_ID = "AREA_ID";

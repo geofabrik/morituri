@@ -304,6 +304,19 @@ void add_lanes_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f
     if (strcmp(number_of_physical_lanes, "0")) builder->add_tag("lanes", number_of_physical_lanes);
 }
 
+void add_postcode_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f) {
+	std::string l_postcode = get_field_from_feature(f, L_POSTCODE);
+	std::string r_postcode = get_field_from_feature(f, R_POSTCODE);
+
+	if (l_postcode.empty() && r_postcode.empty()) return;
+
+	std::string postcode;
+	if (l_postcode == r_postcode) postcode = l_postcode;
+	else postcode = l_postcode + ";" + r_postcode;
+
+	builder->add_tag("addr:postcode", postcode);
+}
+
 void add_highway_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f, link_id_type link_id,
         cdms_map_type* cdms_map, cnd_mod_map_type* cnd_mod_map) {
 
@@ -320,6 +333,7 @@ void add_highway_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr
     add_access_tags(builder, f);
     add_maxspeed_tags(builder, f);
     add_lanes_tag(builder, f);
+    add_postcode_tag(builder, f);
 
     if (parse_bool(get_field_from_feature(f, PAVED))) builder->add_tag("surface", "paved");
     if (parse_bool(get_field_from_feature(f, BRIDGE))) builder->add_tag("bridge", YES);
