@@ -129,6 +129,8 @@ void navteq_plugin::add_administrative_boundaries() {
 
 void navteq_plugin::execute() {
 
+	init_g_admin_bndy_map(dirs);
+
     add_street_shapes(dirs);
     assert__id_uniqueness();
 

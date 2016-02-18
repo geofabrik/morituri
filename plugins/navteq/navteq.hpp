@@ -52,20 +52,8 @@ link_id_map_type g_link_id_map;
 // Provides access to elements in g_way_buffer through offsets
 osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, size_t> g_way_offset_map;
 
-// data structure to store admin boundary tags
-struct mtd_area_dataset {
-    osmium::unsigned_object_id_type area_id;
-    std::string admin_lvl;
-    std::vector<std::pair<std::string, std::string>> lang_code_2_area_name;
-
-    void print() {
-        std::cout << "area_id=" << area_id;
-        std::cout << ", admin_lvl=" << admin_lvl;
-        std::cout << std::endl;
-    }
-};
 // auxiliary map which maps datasets with tags for administrative boundaries
-std::map<osmium::unsigned_object_id_type, mtd_area_dataset> g_mtd_area_map;
+mtd_area_map_type g_mtd_area_map;
 
 // map for conditional modifications
 cnd_mod_map_type g_cnd_mod_map;
@@ -74,6 +62,10 @@ cnd_mod_map_type g_cnd_mod_map;
 cdms_map_type g_cdms_map;
 std::map<area_id_type, govt_code_type> g_area_to_govt_code_map;
 cntry_ref_map_type g_cntry_ref_map;
+
+// maps area_ids to 'name language code'.
+// it is used to tell in which country a street is. (unreliable, improve!)
+admin_bndy_map_type g_admin_bndy_map;
 
 /**
  * \brief Dummy attributes enable josm to read output xml files.
@@ -179,7 +171,7 @@ link_id_type build_tag_list(ogr_feature_uptr& feat, osmium::builder::Builder* bu
     osmium::builder::TagListBuilder tl_builder(buf, builder);
 
     link_id_type link_id = parse_street_tags(&tl_builder, feat, &g_cdms_map, &g_cnd_mod_map, &g_area_to_govt_code_map,
-            &g_cntry_ref_map);
+            &g_cntry_ref_map, &g_admin_bndy_map);
 
     if (z_level != -5 && z_level != 0) tl_builder.add_tag("layer", std::to_string(z_level).c_str());
     if (link_id == 0) throw(format_error("layers column field '" + std::string(LINK_ID) + "' is missing"));
@@ -803,6 +795,33 @@ void process_admin_boundary(ogr_layer_uptr& layer, ogr_feature_uptr& feat) {
     geom.release();
 }
 
+void init_g_admin_bndy_map(boost::filesystem::path admin_shape_file) {
+    ogr_layer_uptr layer(read_shape_file(admin_shape_file));
+    assert(layer->GetGeomType() == wkbPolygon);
+
+    int feature_count = layer->GetFeatureCount(false);
+    assert(feature_count >= 0);
+	for (auto i = 0; i < feature_count; i++) {
+		area_id_type area_id = get_uint_from_feature(layer->GetFeature(i), AREA_ID);
+		std::string lang_code = get_field_from_feature(layer->GetFeature(i), AREA_NAME_LANG_CODE);
+		if (g_admin_bndy_map.find(area_id) == g_admin_bndy_map.end()) {
+			g_admin_bndy_map.insert(std::make_pair(area_id, lang_code));
+		} else if (g_admin_bndy_map.at(area_id) != lang_code) {
+			std::cerr << g_admin_bndy_map.at(area_id) << " != " << lang_code << std::endl;
+		}
+	}
+}
+
+void init_g_admin_bndy_map(path_vector_type dirs){
+    for (auto dir : dirs) {
+        if (shp_file_exists(dir / ADMINBNDY_1_SHP)) init_g_admin_bndy_map(dir / ADMINBNDY_1_SHP);
+        if (shp_file_exists(dir / ADMINBNDY_2_SHP)) init_g_admin_bndy_map(dir / ADMINBNDY_2_SHP);
+        if (shp_file_exists(dir / ADMINBNDY_3_SHP)) init_g_admin_bndy_map(dir / ADMINBNDY_3_SHP);
+        if (shp_file_exists(dir / ADMINBNDY_4_SHP)) init_g_admin_bndy_map(dir / ADMINBNDY_4_SHP);
+        if (shp_file_exists(dir / ADMINBNDY_5_SHP)) init_g_admin_bndy_map(dir / ADMINBNDY_5_SHP);
+    }
+}
+
 /**
  * \brief adds tags from administrative boundaries to mtd_area_map.
  * 		  adds tags from administrative boundaries to mtd_area_map
@@ -825,7 +844,6 @@ void process_meta_areas(boost::filesystem::path dir) {
         data.area_id = area_id;
 
         std::string admin_lvl = std::to_string(dbf_get_uint_by_field(handle, i, ADMIN_LVL));
-
         if (data.admin_lvl.empty()) {
             data.admin_lvl = admin_lvl;
         } else if (data.admin_lvl != admin_lvl) {
@@ -967,10 +985,10 @@ void init_g_cnd_mod_map(const boost::filesystem::path& dir, std::ostream& out) {
     DBFHandle cnd_mod_handle = read_dbf_file(dir / CND_MOD_DBF, out);
     for (int i = 0; i < DBFGetRecordCount(cnd_mod_handle); i++) {
         cond_id_type cond_id = dbf_get_uint_by_field(cnd_mod_handle, i, COND_ID);
-        // std::string lang_code = dbf_get_string_by_field(cnd_mod_handle, i, LANG_CODE);
+        std::string lang_code = dbf_get_string_by_field(cnd_mod_handle, i, LANG_CODE);
         mod_typ_type mod_type = dbf_get_uint_by_field(cnd_mod_handle, i, CM_MOD_TYPE);
         mod_val_type mod_val = dbf_get_uint_by_field(cnd_mod_handle, i, CM_MOD_VAL);
-        g_cnd_mod_map.insert(std::make_pair(cond_id, mod_group_type(mod_type, mod_val)));
+        g_cnd_mod_map.insert(std::make_pair(cond_id, mod_group_type(mod_type, mod_val, lang_code)));
     }
     DBFClose(cnd_mod_handle);
 }

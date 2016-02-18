@@ -17,75 +17,65 @@ bool parse_bool(const char* value) {
     return false;
 }
 
+int ctr = 0;
 // match 'functional class' to 'highway' tag
 void add_highway_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f, link_id_type link_id,
-		uint route_type, uint func_class) {
+		uint route_type, uint func_class, admin_bndy_map_type* admin_bndy_map = nullptr) {
 	const char* highway = "highway";
-
-	const char* motorway = "motorway";
-	const char* primary = "primary";
-	const char* secondary = "secondary";
-	const char* tertiary = "tertiary";
-	const char* residential = "residential";
-	const char* unclassified = "unclassified";
-
 	bool urban = parse_bool(get_field_from_feature(f, URBAN));
+	uint highway_level = 0;
 
-	if (link_id == 871827859){
-		std::cout << link_id << " - route_type=" << route_type << ", func_class=" << func_class << std::endl;
+	std::string country_code;
+
+	area_id_type l_area_id = get_uint_from_feature(f, L_AREA_ID);
+	auto l_it = admin_bndy_map->find(l_area_id);
+	if (l_it != admin_bndy_map->end()) country_code = l_it->second;
+
+	area_id_type r_area_id = get_uint_from_feature(f, R_AREA_ID);
+	auto r_it = admin_bndy_map->find(r_area_id);
+	if (r_it != admin_bndy_map->end()) {
+		if (country_code.empty()) country_code = r_it->second;
+		else if (country_code != r_it->second) std::cout << "different country on right side" << std::endl;
 	}
 
-	uint highway_level = 0;
+	if (country_code.empty()) country_code = get_field_from_feature(f, "ST_LANGCD");
+
+	if (country_code.empty()) std::cout << ctr++ << std::endl;
+
+	std::string country_iso = country_code; // "NOR";
+
 	if (route_type) highway_level = route_type;
 	else if (func_class) highway_level = func_class;
 	else std::cerr << " highway misses route_type and func_class! ";
 
-
+	// if no route_type is specified, assume the following
 	if (!route_type) {
 		if (func_class >= 4) {
-			if (urban) builder->add_tag(highway, residential);
-			else builder->add_tag(highway, tertiary);
+			if (urban) builder->add_tag(highway, RESIDENTIAL);
+			else builder->add_tag(highway, TERTIARY);
 			return;
 		}
 
 		if (func_class >= 2) {
-			builder->add_tag(highway, secondary);
+			builder->add_tag(highway, SECONDARY);
 			return;
 		}
 		if (func_class == 1) {
-			builder->add_tag(highway, primary);
+			builder->add_tag(highway, PRIMARY);
 			return;
 		}
 	}
 
-	if (!route_type && func_class && urban){
-		assert(false);
-		builder->add_tag(highway, primary);
-		return;
+	std::vector<std::string> hwy_lvl_vec;
+	if (HWY_LVL_MAP.find(country_iso) != HWY_LVL_MAP.end()) hwy_lvl_vec = HWY_LVL_MAP.at(country_iso);
+	else hwy_lvl_vec = HWY_LVL_MAP.at("default");
+
+	if (!hwy_lvl_vec.at(highway_level).empty()) {
+		builder->add_tag(highway, hwy_lvl_vec.at(highway_level));
+	} else {
+		std::cerr << "ignoring highway_level'" << std::to_string(highway_level) << "' for " << country_iso << std::endl;
 	}
 
-    switch (highway_level) {
-        case 1:
-            builder->add_tag(highway, motorway);
-            break;
-        case 2:
-            builder->add_tag(highway, motorway);
-            break;
-        case 3:
-            builder->add_tag(highway, primary);
-            break;
-        case 4:
-            builder->add_tag(highway, secondary);
-            break;
-        case 5:
-            builder->add_tag(highway, tertiary);
-            break;
-        case 6:
-            builder->add_tag(highway, unclassified);
-            break;
-        default:
-            std::cerr << "ignoring highway_level'" << std::to_string(highway_level) << "'" << std::endl;
-    }
 }
 
 const char* parse_one_way_tag(const char* value) {
@@ -257,6 +247,7 @@ bool is_imperial(area_id_type l_area_id, area_id_type r_area_id, area_id_govt_co
     return false;
 }
 
+
 /**
  * \brief adds maxheight, maxwidth, maxlength, maxweight and maxaxleload tags.
  */
@@ -273,32 +264,32 @@ void add_additional_restrictions(osmium::builder::TagListBuilder* builder, link_
 
     uint64_t max_height = 0, max_width = 0, max_length = 0, max_weight = 0, max_axleload = 0;
 
-    auto range = cdms_map->equal_range(link_id);
-    for (auto it = range.first; it != range.second; ++it) {
-        cond_id_type cond_id = it->second;
-        auto it2 = cnd_mod_map->find(cond_id);
-        if (it2 != cnd_mod_map->end()) {
-            auto mod_group = it2->second;
-            auto mod_type = mod_group.mod_type;
-            auto mod_val = mod_group.mod_val;
-			if (mod_type == MT_HEIGHT_RESTRICTION) {
-				if (!max_height || mod_val < max_height)
-					max_height = mod_val;
-			} else if (mod_type == MT_WIDTH_RESTRICTION) {
-				if (!max_width || mod_val < max_width)
-					max_width = mod_val;
-			} else if (mod_type == MT_LENGTH_RESTRICTION) {
-				if (!max_length || mod_val < max_length)
-					max_length = mod_val;
-			} else if (mod_type == MT_WEIGHT_RESTRICTION) {
-				if (!max_weight || mod_val < max_weight)
-					max_weight = mod_val;
-			} else if (mod_type == MT_WEIGHT_PER_AXLE_RESTRICTION) {
-				if (!max_axleload || mod_val < max_axleload)
-					max_axleload = mod_val;
-			}
-        }
-    }
+	std::vector<mod_group_type> mod_group_vector;
+	auto range = cdms_map->equal_range(link_id);
+	for (auto it = range.first; it != range.second; ++it) {
+		cond_id_type cond_id = it->second;
+		auto it2 = cnd_mod_map->find(cond_id);
+		if (it2 != cnd_mod_map->end()) {
+			auto mod_group = it2->second;
+			mod_group_vector.push_back(mod_group);
+		}
+	}
+
+	for (auto mod_group : mod_group_vector) {
+		auto mod_type = mod_group.mod_type;
+		auto mod_val = mod_group.mod_val;
+		if (mod_type == MT_HEIGHT_RESTRICTION) {
+			if (!max_height || mod_val < max_height) max_height = mod_val;
+		} else if (mod_type == MT_WIDTH_RESTRICTION) {
+			if (!max_width || mod_val < max_width) max_width = mod_val;
+		} else if (mod_type == MT_LENGTH_RESTRICTION) {
+			if (!max_length || mod_val < max_length) max_length = mod_val;
+		} else if (mod_type == MT_WEIGHT_RESTRICTION) {
+			if (!max_weight || mod_val < max_weight) max_weight = mod_val;
+		} else if (mod_type == MT_WEIGHT_PER_AXLE_RESTRICTION) {
+			if (!max_axleload || mod_val < max_axleload) max_axleload = mod_val;
+		}
+	}
 
 	if (max_height > 0) builder->add_tag("maxheight", imperial_units ? inch_to_feet(max_height) : cm_to_m(max_height));
 	if (max_width > 0)  builder->add_tag("maxwidth", imperial_units ? inch_to_feet(max_width) : cm_to_m(max_width));
@@ -361,27 +352,28 @@ void add_postcode_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr
 }
 
 void add_highway_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f, link_id_type link_id,
-        cdms_map_type* cdms_map, cnd_mod_map_type* cnd_mod_map) {
+		admin_bndy_map_type* admin_bndy_map = nullptr) {
 
-    uint route_type = 0, func_class = 0;
-    std::string route_type_s = get_field_from_feature(f, ROUTE);
-    std::string func_class_s = get_field_from_feature(f, FUNC_CLASS);
+	uint route_type = 0, func_class = 0;
+	std::string route_type_s = get_field_from_feature(f, ROUTE);
+	std::string func_class_s = get_field_from_feature(f, FUNC_CLASS);
 	if (!route_type_s.empty()) route_type = get_uint_from_feature(f, ROUTE);
 	if (!func_class_s.empty()) func_class = get_uint_from_feature(f, FUNC_CLASS);
 
-    add_highway_tag(builder, f, link_id, route_type, func_class);
-    add_one_way_tag(builder, get_field_from_feature(f, DIR_TRAVEL));
-    add_access_tags(builder, f);
-    add_maxspeed_tags(builder, f);
-    add_lanes_tag(builder, f);
-    add_postcode_tag(builder, f);
+	add_highway_tag(builder, f, link_id, route_type, func_class, admin_bndy_map);
 
-    if (parse_bool(get_field_from_feature(f, PAVED))) builder->add_tag("surface", "paved");
-    if (parse_bool(get_field_from_feature(f, BRIDGE))) builder->add_tag("bridge", YES);
-    if (parse_bool(get_field_from_feature(f, TUNNEL))) builder->add_tag("tunnel", YES);
-    if (parse_bool(get_field_from_feature(f, TOLLWAY))) builder->add_tag("toll", YES);
-    if (parse_bool(get_field_from_feature(f, ROUNDABOUT))) builder->add_tag("junction", "roundabout");
-    if (parse_bool(get_field_from_feature(f, FOURWHLDR))) builder->add_tag("4wd_only", YES);
+	add_one_way_tag(builder, get_field_from_feature(f, DIR_TRAVEL));
+	add_access_tags(builder, f);
+	add_maxspeed_tags(builder, f);
+	add_lanes_tag(builder, f);
+	add_postcode_tag(builder, f);
+
+	if (parse_bool(get_field_from_feature(f, PAVED))) builder->add_tag("surface", "paved");
+	if (parse_bool(get_field_from_feature(f, BRIDGE))) builder->add_tag("bridge", YES);
+	if (parse_bool(get_field_from_feature(f, TUNNEL))) builder->add_tag("tunnel", YES);
+	if (parse_bool(get_field_from_feature(f, TOLLWAY))) builder->add_tag("toll", YES);
+	if (parse_bool(get_field_from_feature(f, ROUNDABOUT))) builder->add_tag("junction", "roundabout");
+	if (parse_bool(get_field_from_feature(f, FOURWHLDR))) builder->add_tag("4wd_only", YES);
 }
 
 /**
@@ -390,7 +382,7 @@ void add_highway_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr
  */
 link_id_type parse_street_tags(osmium::builder::TagListBuilder *builder, ogr_feature_uptr& f, cdms_map_type* cdms_map =
         nullptr, cnd_mod_map_type* cnd_mod_map = nullptr, area_id_govt_code_map_type* area_govt_map = nullptr,
-        cntry_ref_map_type* cntry_map = nullptr) {
+        cntry_ref_map_type* cntry_map = nullptr, admin_bndy_map_type* admin_bndy_map = nullptr) {
     const char* link_id_s = get_field_from_feature(f, LINK_ID);
     link_id_type link_id = std::stoul(link_id_s);
     builder->add_tag(LINK_ID, link_id_s); // tag for debug purpose
@@ -399,7 +391,7 @@ link_id_type parse_street_tags(osmium::builder::TagListBuilder *builder, ogr_fea
     if (is_ferry(get_field_from_feature(f, FERRY))) {
         add_ferry_tag(builder, f);
     } else {  // usual highways
-        add_highway_tags(builder, f, link_id, cdms_map, cnd_mod_map);
+        add_highway_tags(builder, f, link_id, admin_bndy_map);
     }
 
     area_id_type l_area_id = get_uint_from_feature(f, L_AREA_ID);

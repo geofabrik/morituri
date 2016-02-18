@@ -73,6 +73,8 @@ const char* R_AREA_ID = "R_AREA_ID";
 const char* L_POSTCODE = "L_POSTCODE";
 const char* R_POSTCODE = "R_POSTCODE";
 
+const char* AREA_NAME_LANG_CODE = "NM_LANGCD";
+
 // MTD_AREA_DBF columns
 const char* AREA_ID = "AREA_ID";
 const char* LANG_CODE = "LANG_CODE";
@@ -142,5 +144,27 @@ static const char* speed_cat_metric[] = {"", ">130", "101-130", "91-100", "71-90
 #define USERID "1"
 #define TIMESTAMP 1
 }
+
+// highway OSM tags
+const char* MOTORWAY = "motorway";
+const char* TRUNK = "trunk";
+const char* PRIMARY = "primary";
+const char* SECONDARY = "secondary";
+const char* TERTIARY = "tertiary";
+const char* RESIDENTIAL = "residential";
+const char* UNCLASSIFIED = "unclassified";
+
+// if using OpenstreetMap Carto, highways are being rendered like here:
+// http://wiki.openstreetmap.org/wiki/Key:highway#Roads
+// TODO: Untested mapping. Add remaining countries and test.
+std::map<std::string, std::vector<std::string>> const HWY_LVL_MAP = {
+	{ "default", { "", MOTORWAY, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
+	{ "GER", { "", MOTORWAY, MOTORWAY, PRIMARY,SECONDARY, TERTIARY, UNCLASSIFIED } }, // tested
+	{ "DEN", { "", MOTORWAY, SECONDARY, TERTIARY, "", "", ""} },
+	{ "SWE", { "", MOTORWAY, PRIMARY, SECONDARY, "", "", "", ""} },
+	{ "NOR", { "", MOTORWAY, TRUNK, PRIMARY,SECONDARY, "", "" } }
+};
+
+
 
 #endif /* PLUGINS_NAVTEQ_MAPPINGS_HPP_ */
