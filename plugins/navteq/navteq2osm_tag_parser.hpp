@@ -18,12 +18,23 @@ bool parse_bool(const char* value) {
 }
 
 int ctr = 0;
+
+std::vector<std::string> get_hwy_vector(std::map<int, std::vector<std::string>> const HWY_TYPE_MAP, uint area_code_1) {
+	std::vector<std::string> hwy_route_type_vec;
+	if (HWY_TYPE_MAP.find(area_code_1) != HWY_TYPE_MAP.end()) {
+		hwy_route_type_vec = HWY_TYPE_MAP.at(area_code_1);
+	} else {
+//		std::cerr << "could not find area_id " << area_code_1 << " use default" << std::endl;
+		hwy_route_type_vec = HWY_TYPE_MAP.at(0);
+	}
+	return hwy_route_type_vec;
+}
+
 // match 'functional class' to 'highway' tag
 void add_highway_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f, link_id_type link_id,
 		uint route_type, uint func_class, mtd_area_map_type* mtd_area_map = nullptr) {
 	const char* highway = "highway";
 	bool urban = parse_bool(get_field_from_feature(f, URBAN));
-	uint highway_level = 0;
 
 	area_id_type l_area_id = get_uint_from_feature(f, L_AREA_ID);
 	area_id_type r_area_id = get_uint_from_feature(f, R_AREA_ID);
@@ -36,42 +47,26 @@ void add_highway_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr&
 	else
 		std::cerr << "could not find area_id " << ++ctr << ", " << mtd_area_map->size() << std::endl;
 
-
-
-	if (route_type) highway_level = route_type;
-	else if (func_class) highway_level = func_class;
-	else std::cerr << " highway misses route_type and func_class! ";
-
-	// if no route_type is specified, assume the following
-	if (!route_type) {
-		if (func_class >= 4) {
-			if (urban) builder->add_tag(highway, RESIDENTIAL);
-			else builder->add_tag(highway, TERTIARY);
-			return;
-		}
-
-		if (func_class >= 2) {
-			builder->add_tag(highway, SECONDARY);
-			return;
-		}
-		if (func_class == 1) {
-			builder->add_tag(highway, PRIMARY);
-			return;
-		}
-	}
-
 	uint area_code_1 = mtd_area_map->at(area_id).area_code_1;
-	std::vector<std::string> hwy_lvl_vec;
-	if (HWY_LVL_MAP.find(area_code_1) != HWY_LVL_MAP.end()) hwy_lvl_vec = HWY_LVL_MAP.at(area_code_1);
-	else {
-		std::cerr << "could not find area_id, use default" << std::endl;
-		hwy_lvl_vec = HWY_LVL_MAP.at(0);
-	}
 
-	if (!hwy_lvl_vec.at(highway_level).empty()) {
-		builder->add_tag(highway, hwy_lvl_vec.at(highway_level));
+	if (route_type){
+		std::string hwy_value = get_hwy_vector(HWY_ROUTE_TYPE_MAP, area_code_1).at(route_type);
+		if (!hwy_value.empty()) {
+			builder->add_tag(highway, hwy_value);
+		} else {
+			std::cerr << "ignoring highway_level'" << std::to_string(route_type) << "' for " << area_code_1
+					<< std::endl;
+		}
+	} else if (func_class) {
+		std::vector<std::string> hwy_func_class_vec = get_hwy_vector(HWY_FUNC_CLASS_MAP, area_code_1);
+		uint apply_func_class = func_class;
+		if (apply_func_class >= 4){
+			apply_func_class = 4;
+			if (urban) apply_func_class++;
+		}
+		builder->add_tag(highway, hwy_func_class_vec.at(apply_func_class));
 	} else {
-		std::cerr << "ignoring highway_level'" << std::to_string(highway_level) << "' for " << area_code_1 << std::endl;
+		std::cerr << " highway misses route_type and func_class! ";
 	}
 
 }

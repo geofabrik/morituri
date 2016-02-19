@@ -158,14 +158,20 @@ const char* UNCLASSIFIED = "unclassified";
 // if using OpenstreetMap Carto, highways are being rendered like here:
 // http://wiki.openstreetmap.org/wiki/Key:highway#Roads
 // TODO: Untested mapping. Add remaining countries and test.
-std::map<int, std::vector<std::string>> const HWY_LVL_MAP = {
+std::map<int, std::vector<std::string>> const HWY_ROUTE_TYPE_MAP = {
 	{   0 /*"DEFAULT"*/, { "", MOTORWAY, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
 	{   6 /*"???"*/, { "", MOTORWAY, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
 	{  19 /*"???"*/, { "", MOTORWAY, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
 	{   3 /*"GER"*/, { "", MOTORWAY, MOTORWAY, PRIMARY,SECONDARY, TERTIARY, UNCLASSIFIED } }, // tested
-	{ 108 /*"DEN"*/, { "", MOTORWAY, SECONDARY, TERTIARY, "", "", ""} },
+	{ 108 /*"DEN"*/, { "", MOTORWAY, MOTORWAY, PRIMARY, "", "", ""} },
 	{ 107 /*"SWE"*/, { "", MOTORWAY, PRIMARY, SECONDARY, "", "", "", ""} },
 	{ 120 /*"NOR"*/, { "", MOTORWAY, TRUNK, PRIMARY,SECONDARY, "", "" } }
+};
+
+std::map<int, std::vector<std::string>> const HWY_FUNC_CLASS_MAP = {
+	{   0 /*"DEFAULT"*/, { "", PRIMARY, SECONDARY, SECONDARY, TERTIARY, RESIDENTIAL, UNCLASSIFIED } },
+	{   3 /*"GER"*/, { "", PRIMARY, SECONDARY, SECONDARY, TERTIARY, RESIDENTIAL, UNCLASSIFIED } },
+	{ 108 /*"DEN"*/, { "", PRIMARY, PRIMARY, SECONDARY, TERTIARY, RESIDENTIAL, UNCLASSIFIED } }
 };
 
 
