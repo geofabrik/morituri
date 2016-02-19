@@ -63,10 +63,6 @@ cdms_map_type g_cdms_map;
 std::map<area_id_type, govt_code_type> g_area_to_govt_code_map;
 cntry_ref_map_type g_cntry_ref_map;
 
-// maps area_ids to 'name language code'.
-// it is used to tell in which country a street is. (unreliable, improve!)
-admin_bndy_map_type g_admin_bndy_map;
-
 /**
  * \brief Dummy attributes enable josm to read output xml files.
  *
@@ -171,7 +167,7 @@ link_id_type build_tag_list(ogr_feature_uptr& feat, osmium::builder::Builder* bu
     osmium::builder::TagListBuilder tl_builder(buf, builder);
 
     link_id_type link_id = parse_street_tags(&tl_builder, feat, &g_cdms_map, &g_cnd_mod_map, &g_area_to_govt_code_map,
-            &g_cntry_ref_map, &g_admin_bndy_map);
+            &g_cntry_ref_map, &g_mtd_area_map);
 
     if (z_level != -5 && z_level != 0) tl_builder.add_tag("layer", std::to_string(z_level).c_str());
     if (link_id == 0) throw(format_error("layers column field '" + std::string(LINK_ID) + "' is missing"));
@@ -795,33 +791,6 @@ void process_admin_boundary(ogr_layer_uptr& layer, ogr_feature_uptr& feat) {
     geom.release();
 }
 
-void init_g_admin_bndy_map(boost::filesystem::path admin_shape_file) {
-    ogr_layer_uptr layer(read_shape_file(admin_shape_file));
-    assert(layer->GetGeomType() == wkbPolygon);
-
-    int feature_count = layer->GetFeatureCount(false);
-    assert(feature_count >= 0);
-	for (auto i = 0; i < feature_count; i++) {
-		area_id_type area_id = get_uint_from_feature(layer->GetFeature(i), AREA_ID);
-		std::string lang_code = get_field_from_feature(layer->GetFeature(i), AREA_NAME_LANG_CODE);
-		if (g_admin_bndy_map.find(area_id) == g_admin_bndy_map.end()) {
-			g_admin_bndy_map.insert(std::make_pair(area_id, lang_code));
-		} else if (g_admin_bndy_map.at(area_id) != lang_code) {
-			std::cerr << g_admin_bndy_map.at(area_id) << " != " << lang_code << std::endl;
-		}
-	}
-}
-
-void init_g_admin_bndy_map(path_vector_type dirs){
-    for (auto dir : dirs) {
-        if (shp_file_exists(dir / ADMINBNDY_1_SHP)) init_g_admin_bndy_map(dir / ADMINBNDY_1_SHP);
-        if (shp_file_exists(dir / ADMINBNDY_2_SHP)) init_g_admin_bndy_map(dir / ADMINBNDY_2_SHP);
-        if (shp_file_exists(dir / ADMINBNDY_3_SHP)) init_g_admin_bndy_map(dir / ADMINBNDY_3_SHP);
-        if (shp_file_exists(dir / ADMINBNDY_4_SHP)) init_g_admin_bndy_map(dir / ADMINBNDY_4_SHP);
-        if (shp_file_exists(dir / ADMINBNDY_5_SHP)) init_g_admin_bndy_map(dir / ADMINBNDY_5_SHP);
-    }
-}
-
 /**
  * \brief adds tags from administrative boundaries to mtd_area_map.
  * 		  adds tags from administrative boundaries to mtd_area_map
@@ -854,6 +823,7 @@ void process_meta_areas(boost::filesystem::path dir) {
         std::string lang_code = dbf_get_string_by_field(handle, i, LANG_CODE);
         std::string area_name = dbf_get_string_by_field(handle, i, AREA_NAME);
         data.lang_code_2_area_name.push_back(std::make_pair(lang_code, to_camel_case_with_spaces(area_name)));
+        data.area_code_1 = dbf_get_uint_by_field(handle, i, AREA_CODE_1);
 
         g_mtd_area_map.insert(std::make_pair(area_id, data));
     }

@@ -20,29 +20,23 @@ bool parse_bool(const char* value) {
 int ctr = 0;
 // match 'functional class' to 'highway' tag
 void add_highway_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f, link_id_type link_id,
-		uint route_type, uint func_class, admin_bndy_map_type* admin_bndy_map = nullptr) {
+		uint route_type, uint func_class, mtd_area_map_type* mtd_area_map = nullptr) {
 	const char* highway = "highway";
 	bool urban = parse_bool(get_field_from_feature(f, URBAN));
 	uint highway_level = 0;
 
-	std::string country_code;
-
 	area_id_type l_area_id = get_uint_from_feature(f, L_AREA_ID);
-	auto l_it = admin_bndy_map->find(l_area_id);
-	if (l_it != admin_bndy_map->end()) country_code = l_it->second;
-
 	area_id_type r_area_id = get_uint_from_feature(f, R_AREA_ID);
-	auto r_it = admin_bndy_map->find(r_area_id);
-	if (r_it != admin_bndy_map->end()) {
-		if (country_code.empty()) country_code = r_it->second;
-		else if (country_code != r_it->second) std::cout << "different country on right side" << std::endl;
-	}
 
-	if (country_code.empty()) country_code = get_field_from_feature(f, "ST_LANGCD");
+	area_id_type area_id;
+	if (mtd_area_map->find(l_area_id) != mtd_area_map->end())
+		area_id = l_area_id;
+	else if (mtd_area_map->find(r_area_id) != mtd_area_map->end())
+		area_id = r_area_id;
+	else
+		std::cerr << "could not find area_id " << ++ctr << ", " << mtd_area_map->size() << std::endl;
 
-	if (country_code.empty()) std::cout << ctr++ << std::endl;
 
-	std::string country_iso = country_code; // "NOR";
 
 	if (route_type) highway_level = route_type;
 	else if (func_class) highway_level = func_class;
@@ -66,14 +60,18 @@ void add_highway_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr&
 		}
 	}
 
+	uint area_code_1 = mtd_area_map->at(area_id).area_code_1;
 	std::vector<std::string> hwy_lvl_vec;
-	if (HWY_LVL_MAP.find(country_iso) != HWY_LVL_MAP.end()) hwy_lvl_vec = HWY_LVL_MAP.at(country_iso);
-	else hwy_lvl_vec = HWY_LVL_MAP.at("default");
+	if (HWY_LVL_MAP.find(area_code_1) != HWY_LVL_MAP.end()) hwy_lvl_vec = HWY_LVL_MAP.at(area_code_1);
+	else {
+		std::cerr << "could not find area_id, use default" << std::endl;
+		hwy_lvl_vec = HWY_LVL_MAP.at(0);
+	}
 
 	if (!hwy_lvl_vec.at(highway_level).empty()) {
 		builder->add_tag(highway, hwy_lvl_vec.at(highway_level));
 	} else {
-		std::cerr << "ignoring highway_level'" << std::to_string(highway_level) << "' for " << country_iso << std::endl;
+		std::cerr << "ignoring highway_level'" << std::to_string(highway_level) << "' for " << area_code_1 << std::endl;
 	}
 
 }
@@ -352,7 +350,7 @@ void add_postcode_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr
 }
 
 void add_highway_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f, link_id_type link_id,
-		admin_bndy_map_type* admin_bndy_map = nullptr) {
+		mtd_area_map_type* mtd_area_map = nullptr) {
 
 	uint route_type = 0, func_class = 0;
 	std::string route_type_s = get_field_from_feature(f, ROUTE);
@@ -360,7 +358,7 @@ void add_highway_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr
 	if (!route_type_s.empty()) route_type = get_uint_from_feature(f, ROUTE);
 	if (!func_class_s.empty()) func_class = get_uint_from_feature(f, FUNC_CLASS);
 
-	add_highway_tag(builder, f, link_id, route_type, func_class, admin_bndy_map);
+	add_highway_tag(builder, f, link_id, route_type, func_class, mtd_area_map);
 
 	add_one_way_tag(builder, get_field_from_feature(f, DIR_TRAVEL));
 	add_access_tags(builder, f);
@@ -382,7 +380,7 @@ void add_highway_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr
  */
 link_id_type parse_street_tags(osmium::builder::TagListBuilder *builder, ogr_feature_uptr& f, cdms_map_type* cdms_map =
         nullptr, cnd_mod_map_type* cnd_mod_map = nullptr, area_id_govt_code_map_type* area_govt_map = nullptr,
-        cntry_ref_map_type* cntry_map = nullptr, admin_bndy_map_type* admin_bndy_map = nullptr) {
+		cntry_ref_map_type* cntry_map = nullptr, mtd_area_map_type* mtd_area_map = nullptr) {
     const char* link_id_s = get_field_from_feature(f, LINK_ID);
     link_id_type link_id = std::stoul(link_id_s);
     builder->add_tag(LINK_ID, link_id_s); // tag for debug purpose
@@ -391,7 +389,7 @@ link_id_type parse_street_tags(osmium::builder::TagListBuilder *builder, ogr_fea
     if (is_ferry(get_field_from_feature(f, FERRY))) {
         add_ferry_tag(builder, f);
     } else {  // usual highways
-        add_highway_tags(builder, f, link_id, admin_bndy_map);
+        add_highway_tags(builder, f, link_id, mtd_area_map);
     }
 
     area_id_type l_area_id = get_uint_from_feature(f, L_AREA_ID);

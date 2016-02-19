@@ -68,6 +68,7 @@ typedef std::map<area_id_type, std::string> admin_bndy_map_type;
 struct mtd_area_dataset {
     osmium::unsigned_object_id_type area_id;
     std::string admin_lvl;
+    uint area_code_1;
     std::vector<std::pair<std::string, std::string>> lang_code_2_area_name;
 
     void print() {

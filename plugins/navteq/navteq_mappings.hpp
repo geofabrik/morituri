@@ -79,6 +79,7 @@ const char* AREA_NAME_LANG_CODE = "NM_LANGCD";
 const char* AREA_ID = "AREA_ID";
 const char* LANG_CODE = "LANG_CODE";
 const char* AREA_NAME = "AREA_NAME";
+const char* AREA_CODE_1 = "AREACODE_1";
 const char* ADMIN_LVL = "ADMIN_LVL";
 const char* GOVT_CODE = "GOVT_CODE";
 
@@ -157,14 +158,15 @@ const char* UNCLASSIFIED = "unclassified";
 // if using OpenstreetMap Carto, highways are being rendered like here:
 // http://wiki.openstreetmap.org/wiki/Key:highway#Roads
 // TODO: Untested mapping. Add remaining countries and test.
-std::map<std::string, std::vector<std::string>> const HWY_LVL_MAP = {
-	{ "default", { "", MOTORWAY, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
-	{ "GER", { "", MOTORWAY, MOTORWAY, PRIMARY,SECONDARY, TERTIARY, UNCLASSIFIED } }, // tested
-	{ "DEN", { "", MOTORWAY, SECONDARY, TERTIARY, "", "", ""} },
-	{ "SWE", { "", MOTORWAY, PRIMARY, SECONDARY, "", "", "", ""} },
-	{ "NOR", { "", MOTORWAY, TRUNK, PRIMARY,SECONDARY, "", "" } }
+std::map<int, std::vector<std::string>> const HWY_LVL_MAP = {
+	{   0 /*"DEFAULT"*/, { "", MOTORWAY, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
+	{   6 /*"???"*/, { "", MOTORWAY, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
+	{  19 /*"???"*/, { "", MOTORWAY, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
+	{   3 /*"GER"*/, { "", MOTORWAY, MOTORWAY, PRIMARY,SECONDARY, TERTIARY, UNCLASSIFIED } }, // tested
+	{ 108 /*"DEN"*/, { "", MOTORWAY, SECONDARY, TERTIARY, "", "", ""} },
+	{ 107 /*"SWE"*/, { "", MOTORWAY, PRIMARY, SECONDARY, "", "", "", ""} },
+	{ 120 /*"NOR"*/, { "", MOTORWAY, TRUNK, PRIMARY,SECONDARY, "", "" } }
 };
-
 
 
 #endif /* PLUGINS_NAVTEQ_MAPPINGS_HPP_ */
