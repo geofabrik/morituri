@@ -28,6 +28,9 @@ void create_testdata(std::string testdata) {
     system_s("python " + test_dir + "create_street_geojson.py " + testdata + " > " + test_geojson);
     system_s("ogr2ogr -overwrite " + tmp_dir + "Streets.shp " + test_geojson);
 
+    system_s("python " + test_dir + "create_mtd_area_geojson.py > " + test_geojson);
+    system_s("ogr2ogr -overwrite " + tmp_dir + "MtdArea.shp " + test_geojson);
+
     system_s("rm -f " + test_geojson);
 }
 
@@ -107,6 +110,8 @@ TEST_CASE("split subway", "[split subway]") {
         std::cout << std::endl;
 
         create_testdata(test.z_lvls.c_str());
+
+        process_meta_areas(tmp_dir, true);
         add_street_shapes(tmp_dir, true);
 
         std::string osm_z_lvl_string;

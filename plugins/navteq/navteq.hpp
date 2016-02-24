@@ -798,8 +798,8 @@ void process_admin_boundary(ogr_layer_uptr& layer, ogr_feature_uptr& feat) {
  * 		  administrative boundaries.
  * \param handle file handle to navteq administrative meta data.
  */
-void process_meta_areas(boost::filesystem::path dir) {
-    DBFHandle handle = read_dbf_file(dir / MTD_AREA_DBF);
+void process_meta_areas(boost::filesystem::path dir, bool test = false) {
+    DBFHandle handle = read_dbf_file(dir / MTD_AREA_DBF, test ? cnull : std::cerr);
 
     link_id_type last_link_id;
     for (int i = 0; i < DBFGetRecordCount(handle); i++) {
