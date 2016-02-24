@@ -135,7 +135,7 @@ There is only a single real test. More tests are welcome.
    	 `builder.add_user("");` Otherwise the buffer is not aligned and 
    	 `buffer.commit()` will cause a crash.
    - Before you can call `buffer.commit()` you have to be sure that the 
-   	 destructor is called, because osmium alignes the buffer in the 
+   	 builders destructor is called, because osmium alignes the buffer in the 
    	 destructor of the builder.
    - When creating objects with tags and/or objects which reference other 
    	 objects, you have to create several builders successively.<br>
