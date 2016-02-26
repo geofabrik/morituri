@@ -140,6 +140,8 @@ void navteq_plugin::execute() {
     assert__id_uniqueness();
 
     add_administrative_boundaries();
+    
+    add_city_nodes(dirs);
 
     if (!output_path.empty()) write_output();
 

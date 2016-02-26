@@ -26,6 +26,8 @@ static const boost::filesystem::path RDMS_DBF = "Rdms.dbf";
 static const boost::filesystem::path CDMS_DBF = "Cdms.dbf";
 static const boost::filesystem::path CND_MOD_DBF = "CndMod.dbf";
 static const boost::filesystem::path ZLEVELS_DBF = "Zlevels.dbf";
+static const boost::filesystem::path MAJ_HWYS_DBF = "MajHwys.dbf";
+static const boost::filesystem::path NAMED_PLC_DBF = "NamedPlc.dbf";
 
 
 // STREETS columns
@@ -101,6 +103,18 @@ const char* COND_VAL1 = "COND_VAL1";
 const char* COND_VAL2 = "COND_VAL2";
 const char* COND_VAL3 = "COND_VAL3";
 const char* COND_VAL4 = "COND_VAL4";
+
+// MAJ_HWYS columns
+//const char* LINK_ID = "LINK_ID";
+const char* HIGHWAY_NM = "HIGHWAY_NM";
+
+// NAMED_PLC columns
+//const char* LINK_ID = "LINK_ID";
+const char* POI_NAME = "POI_NAME";
+const char* FAC_TYPE = "FAC_TYPE";
+const char* POI_NMTYPE = "POI_NMTYPE";
+const char* POPULATION = "POPULATION";
+const char* CAPITAL = "CAPITAL";
 
 // condition types (CT)
 #define CT_TRANSPORT_ACCESS_RESTRICTION 23

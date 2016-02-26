@@ -405,6 +405,43 @@ link_id_type parse_street_tags(osmium::builder::TagListBuilder *builder, ogr_fea
     return link_id;
 }
 
+void add_highway_name_tags(osmium::builder::TagListBuilder *builder, link_id_to_names_map* names_map, link_id_type link_id) {
+    if (names_map->find(link_id) != names_map->end()) {
+        std::vector<std::string> &highway_names_vector = names_map->at(link_id);
+        std::string ref_tag;
+        std::string int_ref_tag;
+       
+        for (auto it : highway_names_vector) {
+            
+            if (ref_tag.empty() || !ref_tag.compare(0, 1, "E"))
+                ref_tag = it;
+            
+            if (!it.compare(0, 1, "E"))
+                int_ref_tag = it;
+             
+            //TODO add to int_ref if way is asian highway ("AH")
+        }
+        
+        if (!ref_tag.empty()) builder->add_tag("ref", ref_tag.c_str());
+        if (!int_ref_tag.empty()) builder->add_tag("int_ref", int_ref_tag.c_str());    
+    }
+}
+
+const char* get_place_value(uint population, uint capital) {
+    if ( capital == 1 || capital == 2
+            || population > 100000)
+        return "city";
+    
+    if (  capital == 3 || capital == 4
+            || population > 10000)
+        return "town";
+    
+    if (  capital == 5
+            || population > 100)
+        return "village";
+    
+    return "hamlet";
+}
 
 // matching from http://www.loc.gov/standards/iso639-2/php/code_list.php
 // http://www.loc.gov/standards/iso639-2/ISO-639-2_utf-8.txt
