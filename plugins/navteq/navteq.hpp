@@ -49,6 +49,9 @@ osmium::unsigned_object_id_type g_osm_id = 1;
 // g_link_id_map maps navteq link_ids to a vector of osm_ids (it will mostly map to a single osm_id)
 link_id_map_type g_link_id_map;
 
+// g_hwys_ref_map maps navteq link_ids to a vector of highway names
+link_id_to_names_map g_hwys_ref_map;
+
 // Provides access to elements in g_way_buffer through offsets
 osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, size_t> g_way_offset_map;
 
@@ -168,6 +171,9 @@ link_id_type build_tag_list(ogr_feature_uptr& feat, osmium::builder::Builder* bu
 
     link_id_type link_id = parse_street_tags(&tl_builder, feat, &g_cdms_map, &g_cnd_mod_map, &g_area_to_govt_code_map,
             &g_cntry_ref_map, &g_mtd_area_map);
+    
+    //add tags for ref and int_ref to major highways
+    add_highway_name_tags(&tl_builder, &g_hwys_ref_map, link_id);
 
     if (z_level != -5 && z_level != 0) tl_builder.add_tag("layer", std::to_string(z_level).c_str());
     if (link_id == 0) throw(format_error("layers column field '" + std::string(LINK_ID) + "' is missing"));
@@ -877,7 +883,7 @@ osm_id_vector_type collect_via_manoeuvre_osm_ids(const link_id_vector_type& via_
             end_point_back = last_way_back;
         } else {
             if (ctr == 1) {
-                // checks wether assumption is valid and corrects it if necessary
+                // checks whether assumption is valid and corrects it if necessary
                 if (end_point_front == first_way_front || end_point_front == last_way_back) {
                     // reverse via_manoeuvre_osm_id
                     std::reverse(via_manoeuvre_osm_id.begin(), via_manoeuvre_osm_id.end());
@@ -948,7 +954,58 @@ void add_turn_restrictions(path_vector_type dirs) {
             // todo find out which direction turn restriction has and apply. For now: always apply 'no_straight_on'
             build_turn_restriction(via_manoeuvre_osm_id);
         }
+        DBFClose(rdms_handle);
     }
+}
+
+void add_city_nodes(path_vector_type dirs) {
+
+    for (auto dir : dirs) {
+        DBFHandle name_place_handle = read_dbf_file(dir / NAMED_PLC_DBF);
+        for (int i = 0; i < DBFGetRecordCount(name_place_handle); i++) {
+
+            link_id_type link_id = dbf_get_uint_by_field(name_place_handle, i, LINK_ID);
+            
+            if (g_link_id_map.find(link_id) == g_link_id_map.end()) {
+                std::cerr << "Skipping city node because of missing link id" << std::endl;
+                continue;
+            }
+            
+            uint fac_type = dbf_get_uint_by_field(name_place_handle, i, FAC_TYPE);
+            if ( fac_type != 4444 ) {
+                std::cerr << "Skipping city node because of wrong POI type" << std::endl;
+                continue;
+            }
+            
+            std::string name_type = dbf_get_string_by_field(name_place_handle, i, POI_NMTYPE);
+            if ( name_type != "B" ) {
+                // Skip this entry as it's just a translated namePlc of former one
+                continue;
+            }
+            
+            //Read location from stored way
+            osm_id_vector_type &osm_id_vector = g_link_id_map.at(link_id);
+            auto first_osm_id = osm_id_vector.at(0);
+            const auto &first_way = g_way_buffer.get<const osmium::Way>(g_way_offset_map.get(first_osm_id));
+            osmium::Location first_way_front = first_way.nodes().front().location();
+
+            //Add new node
+            osmium::builder::NodeBuilder node_builder(g_node_buffer);
+            build_node(first_way_front, &node_builder);
+            osmium::builder::TagListBuilder tl_builder(g_node_buffer, &node_builder);
+                    
+            std::string name = dbf_get_string_by_field(name_place_handle, i, POI_NAME);
+            tl_builder.add_tag("name", to_camel_case_with_spaces( name ));
+            
+            uint population = dbf_get_uint_by_field(name_place_handle, i, POPULATION);
+            if (population > 0) tl_builder.add_tag("population", std::to_string(population));
+            uint capital = dbf_get_uint_by_field(name_place_handle, i, CAPITAL);
+            tl_builder.add_tag("place", get_place_value(population, capital) );
+            
+        }
+        DBFClose(name_place_handle);
+    }
+    g_node_buffer.commit();
 }
 
 void init_g_cnd_mod_map(const boost::filesystem::path& dir, std::ostream& out) {
@@ -1042,6 +1099,25 @@ void init_country_reference(const boost::filesystem::path& dir, std::ostream& ou
     }
 }
 
+void init_major_highway_names(const boost::filesystem::path& dir, std::ostream& out) {
+    if (dbf_file_exists(dir / MAJ_HWYS_DBF)) {
+        DBFHandle maj_hwys_handle = read_dbf_file(dir / MAJ_HWYS_DBF);
+        for (int i = 0; i < DBFGetRecordCount(maj_hwys_handle); i++) {
+
+            link_id_type link_id = dbf_get_uint_by_field(maj_hwys_handle, i, LINK_ID);
+            std::string hwy_name = dbf_get_string_by_field(maj_hwys_handle, i, HIGHWAY_NM);
+            hwy_name = to_camel_case_with_spaces( hwy_name ); //TODO <---skip this?
+
+            if (!fits_street_ref(hwy_name)) continue;
+            
+            if (g_hwys_ref_map.find(link_id) == g_hwys_ref_map.end())
+                g_hwys_ref_map.insert(std::make_pair(link_id, std::vector<std::string>()));
+            g_hwys_ref_map.at(link_id).push_back(hwy_name);
+        }
+        DBFClose(maj_hwys_handle);
+    }
+}
+
 z_lvl_map process_z_levels(const path_vector_type& dirs, ogr_layer_uptr_vector& layer_vector, std::ostream& out) {
     assert(layer_vector.size() == dirs.size());
     z_lvl_map z_level_map;
@@ -1053,6 +1129,7 @@ z_lvl_map process_z_levels(const path_vector_type& dirs, ogr_layer_uptr_vector& 
         init_z_level_map(dir, out, z_level_map);
         init_conditional_driving_manoeuvres(dir, out);
         init_country_reference(dir, out);
+        init_major_highway_names(dir, out);
     }
     return z_level_map;
 }
@@ -1117,6 +1194,14 @@ void add_street_shapes(path_vector_type dirs, bool test = false) {
     for (auto elem : z_level_map)
         elem.second.clear();
     z_level_map.clear();
+    
+    // now we can clear some maps:
+    g_hwys_ref_map.clear();
+    g_cdms_map.clear();
+    g_cnd_mod_map.clear();
+    g_area_to_govt_code_map.clear();
+    g_cntry_ref_map.clear();
+    g_z_lvl_nodes_map.clear();
 }
 
 void add_street_shapes(boost::filesystem::path dir, bool test = false) {
@@ -1158,6 +1243,7 @@ void clear_all() {
     g_rel_buffer.clear();
     g_osm_id = 1;
     g_link_id_map.clear();
+    g_hwys_ref_map.clear();
     g_way_offset_map.clear();
     g_mtd_area_map.clear();
 }

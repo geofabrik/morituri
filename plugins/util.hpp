@@ -64,6 +64,22 @@ bool shp_file_exists(boost::filesystem::path shp_file) {
     return shp_file_exists(shp_file.c_str());
 }
 
+bool fits_street_ref(std::string& st_name) {
+    if (st_name.size() == 0) return false;
+    if (st_name.size() > 6) return false;
+    
+    bool number_started = false;
+    for (auto it = st_name.begin(); it != st_name.end(); ++it) {
+        if (std::isdigit(*it)) {
+             number_started = true;
+        } else if (number_started) {
+            return false;
+        }
+    }
+    
+    return number_started;
+}
+
 /**
 
  * \brief Checks DBF file existance and validity
