@@ -73,10 +73,13 @@ const char* R_AREA_ID = "R_AREA_ID";
 const char* L_POSTCODE = "L_POSTCODE";
 const char* R_POSTCODE = "R_POSTCODE";
 
+const char* AREA_NAME_LANG_CODE = "NM_LANGCD";
+
 // MTD_AREA_DBF columns
 const char* AREA_ID = "AREA_ID";
 const char* LANG_CODE = "LANG_CODE";
 const char* AREA_NAME = "AREA_NAME";
+const char* AREA_CODE_1 = "AREACODE_1";
 const char* ADMIN_LVL = "ADMIN_LVL";
 const char* GOVT_CODE = "GOVT_CODE";
 
@@ -142,5 +145,34 @@ static const char* speed_cat_metric[] = {"", ">130", "101-130", "91-100", "71-90
 #define USERID "1"
 #define TIMESTAMP 1
 }
+
+// highway OSM tags
+const char* MOTORWAY = "motorway";
+const char* TRUNK = "trunk";
+const char* PRIMARY = "primary";
+const char* SECONDARY = "secondary";
+const char* TERTIARY = "tertiary";
+const char* RESIDENTIAL = "residential";
+const char* UNCLASSIFIED = "unclassified";
+
+// if using OpenstreetMap Carto, highways are being rendered like here:
+// http://wiki.openstreetmap.org/wiki/Key:highway#Roads
+// TODO: Untested mapping. Add remaining countries and test.
+std::map<int, std::vector<std::string>> const HWY_ROUTE_TYPE_MAP = {
+	{   0 /*"DEFAULT"*/, { "", MOTORWAY, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
+	{   6 /*"???"*/, { "", MOTORWAY, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
+	{  19 /*"???"*/, { "", MOTORWAY, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
+	{   3 /*"GER"*/, { "", MOTORWAY, MOTORWAY, PRIMARY,SECONDARY, TERTIARY, UNCLASSIFIED } }, // tested
+	{ 108 /*"DEN"*/, { "", MOTORWAY, MOTORWAY, PRIMARY, "", "", ""} },
+	{ 107 /*"SWE"*/, { "", MOTORWAY, PRIMARY, SECONDARY, "", "", "", ""} },
+	{ 120 /*"NOR"*/, { "", MOTORWAY, TRUNK, PRIMARY,SECONDARY, "", "" } }
+};
+
+std::map<int, std::vector<std::string>> const HWY_FUNC_CLASS_MAP = {
+	{   0 /*"DEFAULT"*/, { "", PRIMARY, SECONDARY, SECONDARY, TERTIARY, RESIDENTIAL, UNCLASSIFIED } },
+	{   3 /*"GER"*/, { "", PRIMARY, SECONDARY, SECONDARY, TERTIARY, RESIDENTIAL, UNCLASSIFIED } },
+	{ 108 /*"DEN"*/, { "", PRIMARY, PRIMARY, SECONDARY, TERTIARY, RESIDENTIAL, UNCLASSIFIED } }
+};
+
 
 #endif /* PLUGINS_NAVTEQ_MAPPINGS_HPP_ */

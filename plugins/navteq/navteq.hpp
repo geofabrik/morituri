@@ -52,20 +52,8 @@ link_id_map_type g_link_id_map;
 // Provides access to elements in g_way_buffer through offsets
 osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, size_t> g_way_offset_map;
 
-// data structure to store admin boundary tags
-struct mtd_area_dataset {
-    osmium::unsigned_object_id_type area_id;
-    std::string admin_lvl;
-    std::vector<std::pair<std::string, std::string>> lang_code_2_area_name;
-
-    void print() {
-        std::cout << "area_id=" << area_id;
-        std::cout << ", admin_lvl=" << admin_lvl;
-        std::cout << std::endl;
-    }
-};
 // auxiliary map which maps datasets with tags for administrative boundaries
-std::map<osmium::unsigned_object_id_type, mtd_area_dataset> g_mtd_area_map;
+mtd_area_map_type g_mtd_area_map;
 
 // map for conditional modifications
 cnd_mod_map_type g_cnd_mod_map;
@@ -179,7 +167,7 @@ link_id_type build_tag_list(ogr_feature_uptr& feat, osmium::builder::Builder* bu
     osmium::builder::TagListBuilder tl_builder(buf, builder);
 
     link_id_type link_id = parse_street_tags(&tl_builder, feat, &g_cdms_map, &g_cnd_mod_map, &g_area_to_govt_code_map,
-            &g_cntry_ref_map);
+            &g_cntry_ref_map, &g_mtd_area_map);
 
     if (z_level != -5 && z_level != 0) tl_builder.add_tag("layer", std::to_string(z_level).c_str());
     if (link_id == 0) throw(format_error("layers column field '" + std::string(LINK_ID) + "' is missing"));
@@ -810,8 +798,8 @@ void process_admin_boundary(ogr_layer_uptr& layer, ogr_feature_uptr& feat) {
  * 		  administrative boundaries.
  * \param handle file handle to navteq administrative meta data.
  */
-void process_meta_areas(boost::filesystem::path dir) {
-    DBFHandle handle = read_dbf_file(dir / MTD_AREA_DBF);
+void process_meta_areas(boost::filesystem::path dir, bool test = false) {
+    DBFHandle handle = read_dbf_file(dir / MTD_AREA_DBF, test ? cnull : std::cerr);
 
     link_id_type last_link_id;
     for (int i = 0; i < DBFGetRecordCount(handle); i++) {
@@ -825,7 +813,6 @@ void process_meta_areas(boost::filesystem::path dir) {
         data.area_id = area_id;
 
         std::string admin_lvl = std::to_string(dbf_get_uint_by_field(handle, i, ADMIN_LVL));
-
         if (data.admin_lvl.empty()) {
             data.admin_lvl = admin_lvl;
         } else if (data.admin_lvl != admin_lvl) {
@@ -836,6 +823,7 @@ void process_meta_areas(boost::filesystem::path dir) {
         std::string lang_code = dbf_get_string_by_field(handle, i, LANG_CODE);
         std::string area_name = dbf_get_string_by_field(handle, i, AREA_NAME);
         data.lang_code_2_area_name.push_back(std::make_pair(lang_code, to_camel_case_with_spaces(area_name)));
+        data.area_code_1 = dbf_get_uint_by_field(handle, i, AREA_CODE_1);
 
         g_mtd_area_map.insert(std::make_pair(area_id, data));
     }
@@ -967,10 +955,10 @@ void init_g_cnd_mod_map(const boost::filesystem::path& dir, std::ostream& out) {
     DBFHandle cnd_mod_handle = read_dbf_file(dir / CND_MOD_DBF, out);
     for (int i = 0; i < DBFGetRecordCount(cnd_mod_handle); i++) {
         cond_id_type cond_id = dbf_get_uint_by_field(cnd_mod_handle, i, COND_ID);
-        // std::string lang_code = dbf_get_string_by_field(cnd_mod_handle, i, LANG_CODE);
+        std::string lang_code = dbf_get_string_by_field(cnd_mod_handle, i, LANG_CODE);
         mod_typ_type mod_type = dbf_get_uint_by_field(cnd_mod_handle, i, CM_MOD_TYPE);
         mod_val_type mod_val = dbf_get_uint_by_field(cnd_mod_handle, i, CM_MOD_VAL);
-        g_cnd_mod_map.insert(std::make_pair(cond_id, mod_group_type(mod_type, mod_val)));
+        g_cnd_mod_map.insert(std::make_pair(cond_id, mod_group_type(mod_type, mod_val, lang_code)));
     }
     DBFClose(cnd_mod_handle);
 }
