@@ -20,6 +20,7 @@ private:
     bool check_files(boost::filesystem::path dir);
     void write_output();
     void add_administrative_boundaries();
+    void add_water();
 
     path_vector_type dirs;
 

@@ -127,12 +127,19 @@ void navteq_plugin::add_administrative_boundaries() {
     g_mtd_area_map.clear();
 }
 
+void navteq_plugin::add_water() {
+    for (auto dir : dirs) {
+        if (shp_file_exists(dir / WATER_POLY_SHP)) add_water_shape(dir / WATER_POLY_SHP);
+        if (shp_file_exists(dir / WATER_SEG_SHP )) add_water_shape(dir / WATER_SEG_SHP );
+    }
+}
+
 void navteq_plugin::execute() {
 
     for (auto dir : dirs){
         process_meta_areas(dir);
     }
-
+    
     add_street_shapes(dirs);
     assert__id_uniqueness();
 
@@ -140,6 +147,8 @@ void navteq_plugin::execute() {
     assert__id_uniqueness();
 
     add_administrative_boundaries();
+    
+    add_water();
     
     add_city_nodes(dirs);
 
