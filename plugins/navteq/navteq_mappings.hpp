@@ -19,6 +19,8 @@ static const boost::filesystem::path ADMINBNDY_2_SHP = "Adminbndy2.shp";
 static const boost::filesystem::path ADMINBNDY_3_SHP = "Adminbndy3.shp";
 static const boost::filesystem::path ADMINBNDY_4_SHP = "Adminbndy4.shp";
 static const boost::filesystem::path ADMINBNDY_5_SHP = "Adminbndy5.shp";
+static const boost::filesystem::path WATER_SEG_SHP = "WaterSeg.shp";
+static const boost::filesystem::path WATER_POLY_SHP = "WaterPoly.shp";
 
 static const boost::filesystem::path MTD_CNTRY_REF_DBF = "MtdCntryRef.dbf";
 static const boost::filesystem::path MTD_AREA_DBF = "MtdArea.dbf";
@@ -115,6 +117,10 @@ const char* FAC_TYPE = "FAC_TYPE";
 const char* POI_NMTYPE = "POI_NMTYPE";
 const char* POPULATION = "POPULATION";
 const char* CAPITAL = "CAPITAL";
+
+// WaterSeg and WaterPoly columns
+const char* POLYGON_NM = "POLYGON_NM";
+const char* FEAT_COD = "FEAT_COD";
 
 // condition types (CT)
 #define CT_TRANSPORT_ACCESS_RESTRICTION 23
