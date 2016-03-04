@@ -183,7 +183,7 @@ std::map<int, std::vector<std::string>> const HWY_ROUTE_TYPE_MAP = {
 	{   6 /*"???"*/, { "", MOTORWAY, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
 	{  19 /*"???"*/, { "", MOTORWAY, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
 	{   3 /*"GER"*/, { "", MOTORWAY, MOTORWAY, PRIMARY,SECONDARY, TERTIARY, UNCLASSIFIED } }, // tested
-	{ 108 /*"DEN"*/, { "", MOTORWAY, MOTORWAY, PRIMARY, "", "", ""} },
+	{ 108 /*"DEN"*/, { "", MOTORWAY, PRIMARY, SECONDARY, "", "", ""} },
 	{ 107 /*"SWE"*/, { "", MOTORWAY, PRIMARY, SECONDARY, "", "", "", ""} },
 	{ 120 /*"NOR"*/, { "", MOTORWAY, TRUNK, PRIMARY,SECONDARY, "", "" } }
 };
@@ -191,7 +191,8 @@ std::map<int, std::vector<std::string>> const HWY_ROUTE_TYPE_MAP = {
 std::map<int, std::vector<std::string>> const HWY_FUNC_CLASS_MAP = {
 	{   0 /*"DEFAULT"*/, { "", PRIMARY, SECONDARY, SECONDARY, TERTIARY, RESIDENTIAL, UNCLASSIFIED } },
 	{   3 /*"GER"*/, { "", PRIMARY, SECONDARY, SECONDARY, TERTIARY, RESIDENTIAL, UNCLASSIFIED } },
-	{ 108 /*"DEN"*/, { "", PRIMARY, PRIMARY, SECONDARY, TERTIARY, RESIDENTIAL, UNCLASSIFIED } }
+	{ 108 /*"DEN"*/, { "", PRIMARY, PRIMARY, SECONDARY, TERTIARY, RESIDENTIAL, UNCLASSIFIED } },
+        { 107 /*"SWE"*/, { "", PRIMARY, PRIMARY, SECONDARY, TERTIARY, RESIDENTIAL, UNCLASSIFIED } }
 };
 
 

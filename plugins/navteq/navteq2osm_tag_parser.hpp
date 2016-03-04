@@ -105,53 +105,6 @@ void add_access_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr&
 }
 
 /**
- * \brief apply camel case with spaces to char*
- */
-const char* to_camel_case_with_spaces(char* camel) {
-    bool new_word = true;
-    for (char *i = camel; *i; i++) {
-        if (std::isalpha(*i)) {
-            if (new_word) {
-                *i = std::toupper(*i);
-                new_word = false;
-            } else {
-                *i = std::tolower(*i);
-            }
-        } else
-            new_word = true;
-    }
-    return camel;
-}
-
-/**
- * \brief apply camel case with spaces to string
- */
-std::string& to_camel_case_with_spaces(std::string& camel) {
-    bool new_word = true;
-    for (auto it = camel.begin(); it != camel.end(); ++it) {
-        if (std::isalpha(*it)) {
-            if (new_word) {
-                *it = std::toupper(*it);
-                new_word = false;
-            } else {
-                *it = std::tolower(*it);
-            }
-        } else
-            new_word = true;
-    }
-    return camel;
-}
-
-/**
- * \brief duplicate const char* value to change
- */
-std::string to_camel_case_with_spaces(const char* camel) {
-    std::string s(camel);
-    to_camel_case_with_spaces(s);
-    return s;
-}
-
-/**
  * \brief adds maxspeed tag
  */
 void add_maxspeed_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f) {
@@ -240,6 +193,21 @@ bool is_imperial(area_id_type l_area_id, area_id_type r_area_id, area_id_govt_co
     return false;
 }
 
+bool fits_street_ref(std::string& st_name) {
+    if (st_name.size() == 0) return false;
+    if (st_name.size() > 6) return false;
+    
+    bool number_started = false;
+    for (auto it = st_name.begin(); it != st_name.end(); ++it) {
+        if (std::isdigit(*it)) {
+             number_started = true;
+        } else if (number_started) {
+            return false;
+        }
+    }
+    
+    return number_started;
+}
 
 /**
  * \brief adds maxheight, maxwidth, maxlength, maxweight and maxaxleload tags.
