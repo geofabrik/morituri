@@ -23,6 +23,8 @@
 #include "ogr_types.hpp"
 #include "ogr_util.hpp"
 
+#include <unicode/unistr.h>
+
 #include <bits/unique_ptr.h>
 
 const int INCH_BASE = 12;
@@ -62,22 +64,6 @@ bool shp_file_exists(std::string shp_file) {
 
 bool shp_file_exists(boost::filesystem::path shp_file) {
     return shp_file_exists(shp_file.c_str());
-}
-
-bool fits_street_ref(std::string& st_name) {
-    if (st_name.size() == 0) return false;
-    if (st_name.size() > 6) return false;
-    
-    bool number_started = false;
-    for (auto it = st_name.begin(); it != st_name.end(); ++it) {
-        if (std::isdigit(*it)) {
-             number_started = true;
-        } else if (number_started) {
-            return false;
-        }
-    }
-    
-    return number_started;
 }
 
 /**
@@ -230,5 +216,23 @@ static_unique_ptr_cast( std::unique_ptr<Base, Del>&& p )
     return std::unique_ptr<Derived, Del>(d, std::move(p.get_deleter()));
 }
 
+/**
+ * \brief duplicate const char* value to change
+ */
+std::string to_camel_case_with_spaces(const char* camel) {
+    icu::UnicodeString uniString( camel, "UTF-8" );
+    uniString.toTitle(0);
+    
+    std::string response;
+    uniString.toUTF8String(response);
+    return response;
+}
+
+/**
+ * \brief apply camel case with spaces to string
+ */
+std::string to_camel_case_with_spaces(std::string camel) {
+    return to_camel_case_with_spaces(camel.c_str());
+}
 
 #endif /* UTIL_HPP_ */
