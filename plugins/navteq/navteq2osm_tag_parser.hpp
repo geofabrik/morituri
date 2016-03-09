@@ -209,6 +209,38 @@ bool fits_street_ref(std::string& st_name) {
     return number_started;
 }
 
+void add_hazmat_tag(osmium::builder::TagListBuilder* builder, mod_val_type mod_val) {
+    if (mod_val == 20) { // || mod_val == 21
+        builder->add_tag("hazmat", "no");
+    } else if (mod_val == 22) {
+        builder->add_tag("hazmat:water", "no");
+    } else if (mod_val == 24) {
+        builder->add_tag("hazmat:B", "no");
+    } else if (mod_val == 28) {
+        builder->add_tag("hazmat:C", "no");
+    } else if (mod_val == 32) {
+        builder->add_tag("hazmat:D", "no");
+    } else if (mod_val == 34) {
+        builder->add_tag("hazmat:E", "no");
+    } else {
+        /**
+         * Do nothing for the residual values,
+         * which do not occur and/or have no proper OSM tagging equivalent
+         * 1 = Explosives
+         * 2 = Gas
+         * 3 = Flammable
+         * 4 = Flammable solid/Combustible
+         * 5 = Organic
+         * 6 = Poison
+         * 7 = Radioactive
+         * 8 = Corrosive
+         * 9 = Other
+         * 23 = Explosive and Flammable
+         */
+        std::cerr << "Hazardous material value " << mod_val << " hasn't been parsed!" << std::endl;
+    }
+}
+
 /**
  * \brief adds maxheight, maxwidth, maxlength, maxweight and maxaxleload tags.
  */
@@ -240,15 +272,17 @@ void add_additional_restrictions(osmium::builder::TagListBuilder* builder, link_
 		auto mod_type = mod_group.mod_type;
 		auto mod_val = mod_group.mod_val;
 		if (mod_type == MT_HEIGHT_RESTRICTION) {
-			if (!max_height || mod_val < max_height) max_height = mod_val;
+                    if (!max_height || mod_val < max_height) max_height = mod_val;
 		} else if (mod_type == MT_WIDTH_RESTRICTION) {
-			if (!max_width || mod_val < max_width) max_width = mod_val;
+                    if (!max_width || mod_val < max_width) max_width = mod_val;
 		} else if (mod_type == MT_LENGTH_RESTRICTION) {
-			if (!max_length || mod_val < max_length) max_length = mod_val;
+                    if (!max_length || mod_val < max_length) max_length = mod_val;
 		} else if (mod_type == MT_WEIGHT_RESTRICTION) {
-			if (!max_weight || mod_val < max_weight) max_weight = mod_val;
+                    if (!max_weight || mod_val < max_weight) max_weight = mod_val;
 		} else if (mod_type == MT_WEIGHT_PER_AXLE_RESTRICTION) {
-			if (!max_axleload || mod_val < max_axleload) max_axleload = mod_val;
+                    if (!max_axleload || mod_val < max_axleload) max_axleload = mod_val;
+		} else if (mod_type == MT_HAZARDOUS_RESTRICTION) {
+                    add_hazmat_tag(builder, mod_val);
 		}
 	}
 
