@@ -185,7 +185,7 @@ link_id_type build_tag_list(ogr_feature_uptr& feat, osmium::builder::Builder* bu
  * \param location Location of Node being created.
  * \param builder NodeBuilder to create Node.
  * \return id of created Node.
- * */
+ */
 osmium::unsigned_object_id_type build_node(osmium::Location location, osmium::builder::NodeBuilder* builder) {
     assert(builder != nullptr);
     STATIC_NODE(builder->object()).set_id(g_osm_id++);
@@ -199,7 +199,7 @@ osmium::unsigned_object_id_type build_node(osmium::Location location, osmium::bu
  * \brief creates Node and writes it to m_buffer.
  * \param location Location of Node being created.
  * \return id of created Node.
- * */
+ */
 osmium::unsigned_object_id_type build_node(osmium::Location location) {
     osmium::builder::NodeBuilder builder(g_node_buffer);
     return build_node(location, &builder);
@@ -527,6 +527,12 @@ void set_ferry_z_lvls_to_zero(ogr_feature_uptr& feat, index_z_lvl_vector_type& z
         z_lvl_vec.erase(z_lvl_vec.end());
 }
 
+/**
+ * \brief creates interpolated house numbers alongside of a given linestring if feature holds suitable tags
+ * \param feat feature which holds the tags
+ * \param ogr_ls linestring which receives the interpolated house numbers
+ * \param left specifies on which side of the linestring the house numbers will be applied
+ */
 void create_house_numbers(ogr_feature_uptr& feat, ogr_line_string_uptr& ogr_ls, bool left) {
     const char* ref_addr = left ? L_REFADDR : R_REFADDR;
     const char* nref_addr = left ? L_NREFADDR : R_NREFADDR;
@@ -537,7 +543,7 @@ void create_house_numbers(ogr_feature_uptr& feat, ogr_line_string_uptr& ogr_ls, 
     if (!strcmp(get_field_from_feature(feat, addr_schema), "")) return;
     if (!strcmp(get_field_from_feature(feat, addr_schema), "M")) return;
 
-    ogr_line_string_uptr offset_ogr_ls(create_offset_curve(ogr_ls.get(), 0.00005, left));
+	ogr_line_string_uptr offset_ogr_ls(create_offset_curve(ogr_ls.get(), HOUSENUMBER_CURVE_OFFSET, left));
     assert(ogr_ls);
     osmium::builder::WayBuilder way_builder(g_way_buffer);
     STATIC_WAY(way_builder.object()).set_id(g_osm_id++);
@@ -988,6 +994,12 @@ void process_meta_areas(boost::filesystem::path dir, bool test = false) {
         g_mtd_area_map.insert(std::make_pair(area_id, data));
     }
     DBFClose(handle);
+}
+
+void preprocess_meta_areas(path_vector_type dirs, bool test = false) {
+    for (auto dir : dirs){
+        process_meta_areas(dir);
+    }
 }
 
 link_id_vector_type collect_via_manoeuvre_link_ids(link_id_type link_id, DBFHandle rdms_handle,

@@ -195,5 +195,6 @@ std::map<int, std::vector<std::string>> const HWY_FUNC_CLASS_MAP = {
         { 107 /*"SWE"*/, { "", PRIMARY, PRIMARY, SECONDARY, TERTIARY, RESIDENTIAL, UNCLASSIFIED } }
 };
 
+const double HOUSENUMBER_CURVE_OFFSET = 0.00005;
 
 #endif /* PLUGINS_NAVTEQ_MAPPINGS_HPP_ */

@@ -15,9 +15,7 @@
 
 /*
  * \brief Checks shapefile existance and validity.
- *
  * \param shp_file path and file name of shapefile.
- *
  * \return Pointer to first layer in Shapefile.
  * */
 

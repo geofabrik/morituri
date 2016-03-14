@@ -133,13 +133,6 @@ TEST_CASE("lbs_to_metric_ton", "[lbs_to_metric_ton]"){
     CHECK(lbs_to_metric_ton(10000)  == std::string("4.53592"));
 }
 
-TEST_CASE("to_lower", "[to_lower]"){
-    CHECK(to_lower("Abc") == std::string("abc"));
-    CHECK(to_lower("AbC") == std::string("abc"));
-    CHECK(to_lower("aBC") == std::string("abc"));
-    CHECK(to_lower("abc") == std::string("abc"));
-}
-
 TEST_CASE("init_map_at_element", "[init_map_at_element]"){
     std::map<int,int> m;
     init_map_at_element(&m, 1, 2);

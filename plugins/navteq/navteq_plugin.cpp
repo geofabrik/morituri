@@ -111,11 +111,7 @@ void navteq_plugin::write_output() {
 }
 
 void navteq_plugin::add_administrative_boundaries() {
-
     // todo admin-levels only apply to the US => more generic for all countries
-//    for (auto dir : dirs){
-//        process_meta_areas(dir);
-//    }
 
     for (auto dir : dirs) {
         if (shp_file_exists(dir / ADMINBNDY_1_SHP)) add_admin_shape(dir / ADMINBNDY_1_SHP);
@@ -136,9 +132,7 @@ void navteq_plugin::add_water() {
 
 void navteq_plugin::execute() {
 
-    for (auto dir : dirs){
-        process_meta_areas(dir);
-    }
+    preprocess_meta_areas(dirs);
     
     add_street_shapes(dirs);
     assert__id_uniqueness();
