@@ -11,6 +11,10 @@ TEST_CASE("Shapefile exists", "[SHP exist]"){
     CHECK(shp_file_exists(std::string("tests/testdata/faroe-islands-latest/roads.shp")) == true);
     CHECK(shp_file_exists(std::string("tests/testdata/faroe-islands-latest/README")) == false);
     CHECK(shp_file_exists(std::string("tests/testdata/faroe-islands-latest/???")) == false);
+
+    CHECK(shp_file_exists(boost::filesystem::path("tests/testdata/faroe-islands-latest/roads.shp")) == true);
+    CHECK(shp_file_exists(boost::filesystem::path("tests/testdata/faroe-islands-latest/README")) == false);
+    CHECK(shp_file_exists(boost::filesystem::path("tests/testdata/faroe-islands-latest/???")) == false);
 }
 
 TEST_CASE("DBF exists", "[DBF exist]"){
@@ -21,6 +25,10 @@ TEST_CASE("DBF exists", "[DBF exist]"){
     CHECK(dbf_file_exists(std::string("tests/testdata/faroe-islands-latest/roads.dbf")) == true);
     CHECK(dbf_file_exists(std::string("tests/testdata/faroe-islands-latest/README")) == false);
     CHECK(dbf_file_exists(std::string("tests/testdata/faroe-islands-latest/???")) == false);
+
+    CHECK(dbf_file_exists(boost::filesystem::path("tests/testdata/faroe-islands-latest/roads.dbf")) == true);
+    CHECK(dbf_file_exists(boost::filesystem::path("tests/testdata/faroe-islands-latest/README")) == false);
+    CHECK(dbf_file_exists(boost::filesystem::path("tests/testdata/faroe-islands-latest/???")) == false);
 }
 
 TEST_CASE("is_in_range", "[is_in_range]"){
