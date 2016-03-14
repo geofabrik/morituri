@@ -205,13 +205,23 @@ osmium::unsigned_object_id_type build_node(osmium::Location location) {
     return build_node(location, &builder);
 }
 
-osmium::unsigned_object_id_type build_node_with_tag(osmium::Location location, const char* tag_key,
-        const char* tag_val) {
+/**
+ * \brief creates Node with tags and writes it to m_buffer.
+ * \param location Location of Node being created.
+ * \param kv_vector holds tags as key value pairs
+ * \return id of created Node.
+ */
+osmium::unsigned_object_id_type build_node_with_tags(osmium::Location location, const std::vector<key_val_pair_type>& kv_vector) {
     osmium::builder::NodeBuilder node_builder(g_node_buffer);
     auto node_id = build_node(location, &node_builder);
-    if (tag_key) {
-        osmium::builder::TagListBuilder tl_builder(g_node_buffer, &node_builder);
-        tl_builder.add_tag(tag_key, tag_val);
+
+    osmium::builder::TagListBuilder tl_builder(g_node_buffer, &node_builder);
+    for (auto kv_pair : kv_vector){
+		auto tag_key = kv_pair.first;
+		auto tag_val = kv_pair.second;
+		if (tag_key) {
+			tl_builder.add_tag(tag_key, tag_val);
+		}
     }
     return node_id;
 }
@@ -553,15 +563,17 @@ void create_house_numbers(ogr_feature_uptr& feat, ogr_line_string_uptr& ogr_ls, 
     for (int i = 0; i < offset_ogr_ls->getNumPoints(); i++) {
         osmium::Location location(offset_ogr_ls->getX(i), offset_ogr_ls->getY(i));
         assert(location.valid());
-        osmium::unsigned_object_id_type node_id;
-        if (i == 0) {
-            node_id = build_node_with_tag(location, "addr:housenumber", get_field_from_feature(feat, ref_addr));
-        } else if (i == offset_ogr_ls->getNumPoints() - 1) {
-            node_id = build_node_with_tag(location, "addr:housenumber", get_field_from_feature(feat, nref_addr));
-        } else {
-            node_id = build_node(location);
-        }
 
+        std::vector<key_val_pair_type> tags;
+        if (i == 0 || i == offset_ogr_ls->getNumPoints() - 1){
+			if (i == 0){
+				tags.push_back(key_val_pair_type("addr:housenumber", get_field_from_feature(feat, left ? ref_addr : nref_addr)));
+			} else if (i == offset_ogr_ls->getNumPoints() - 1) {
+				tags.push_back(key_val_pair_type("addr:housenumber", get_field_from_feature(feat, left ? nref_addr : ref_addr)));
+			}
+			tags.push_back(key_val_pair_type("addr:street", to_camel_case_with_spaces(get_field_from_feature(feat, ST_NAME)).c_str()));
+        }
+        osmium::unsigned_object_id_type node_id = build_node_with_tags(location, tags);
         wnl_builder.add_node_ref(osmium::NodeRef(node_id, location));
     }
     {
