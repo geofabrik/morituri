@@ -12,6 +12,7 @@
 #include <gdal/ogrsf_frmts.h>
 #include <shapefil.h>
 #include <osmium/osm/types.hpp>
+#include <osmium/builder/osm_object_builder.hpp>
 #include <sstream>
 #include <boost/iostreams/stream.hpp>
 #include <boost/iostreams/device/null.hpp>
@@ -233,6 +234,14 @@ std::string to_camel_case_with_spaces(const char* camel) {
  */
 std::string to_camel_case_with_spaces(std::string camel) {
     return to_camel_case_with_spaces(camel.c_str());
+}
+
+void add_uint_tag(osmium::builder::TagListBuilder* tl_builder, const char* tag_key,
+        uint uint_tag_val) {
+    std::string val_s = std::to_string(uint_tag_val);
+    if (tag_key) {
+        tl_builder->add_tag(tag_key, val_s.c_str());
+    }
 }
 
 #endif /* UTIL_HPP_ */

@@ -30,6 +30,7 @@ static const boost::filesystem::path CND_MOD_DBF = "CndMod.dbf";
 static const boost::filesystem::path ZLEVELS_DBF = "Zlevels.dbf";
 static const boost::filesystem::path MAJ_HWYS_DBF = "MajHwys.dbf";
 static const boost::filesystem::path NAMED_PLC_DBF = "NamedPlc.dbf";
+static const boost::filesystem::path ALT_STREETS_DBF = "AltStreets.dbf";
 
 
 // STREETS columns
@@ -65,6 +66,7 @@ const char* PRIVATE = "PRIVATE";
 const char* BRIDGE = "BRIDGE";
 const char* TUNNEL = "TUNNEL";
 const char* TOLLWAY = "TOLLWAY";
+const char* CONTRACC = "CONTRACC";
 const char* ROUNDABOUT = "ROUNDABOUT";
 const char* FERRY = "FERRY_TYPE";
 const char* URBAN = "URBAN";
@@ -173,27 +175,32 @@ const char* TRUNK = "trunk";
 const char* PRIMARY = "primary";
 const char* SECONDARY = "secondary";
 const char* TERTIARY = "tertiary";
-const char* RESIDENTIAL = "residential";
 const char* UNCLASSIFIED = "unclassified";
+const char* RESIDENTIAL = "residential";
+const char* TRACK = "track";
+const char* PATH = "path";
+const char* FOOTWAY = "footway";
 
 // if using OpenstreetMap Carto, highways are being rendered like here:
 // http://wiki.openstreetmap.org/wiki/Key:highway#Roads
 // TODO: Untested mapping. Add remaining countries and test.
 std::map<int, std::vector<std::string>> const HWY_ROUTE_TYPE_MAP = {
-	{   0 /*"DEFAULT"*/, { "", MOTORWAY, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
-	{   6 /*"???"*/, { "", MOTORWAY, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
-	{  19 /*"???"*/, { "", MOTORWAY, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
-	{   3 /*"GER"*/, { "", MOTORWAY, MOTORWAY, PRIMARY,SECONDARY, TERTIARY, UNCLASSIFIED } }, // tested
-	{ 108 /*"DEN"*/, { "", MOTORWAY, PRIMARY, SECONDARY, "", "", ""} },
-	{ 107 /*"SWE"*/, { "", MOTORWAY, PRIMARY, SECONDARY, "", "", "", ""} },
-	{ 120 /*"NOR"*/, { "", MOTORWAY, TRUNK, PRIMARY,SECONDARY, "", "" } }
+	{   0 /*"DEFAULT"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
+	{   6 /*"???"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
+	{  19 /*"???"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
+	{   3 /*"GER"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } }, // tested
+	{ 108 /*"DEN"*/, { "", TRUNK, PRIMARY, SECONDARY, "", "", ""} },
+	{ 107 /*"SWE"*/, { "", TRUNK, PRIMARY, SECONDARY, "", "", "", ""} },
+	{ 120 /*"NOR"*/, { "", TRUNK, PRIMARY, SECONDARY, TERTIARY, "", "" } }
 };
 
 std::map<int, std::vector<std::string>> const HWY_FUNC_CLASS_MAP = {
-	{   0 /*"DEFAULT"*/, { "", PRIMARY, SECONDARY, SECONDARY, TERTIARY, RESIDENTIAL, UNCLASSIFIED } },
-	{   3 /*"GER"*/, { "", PRIMARY, SECONDARY, SECONDARY, TERTIARY, RESIDENTIAL, UNCLASSIFIED } },
-	{ 108 /*"DEN"*/, { "", PRIMARY, PRIMARY, SECONDARY, TERTIARY, RESIDENTIAL, UNCLASSIFIED } },
-        { 107 /*"SWE"*/, { "", PRIMARY, PRIMARY, SECONDARY, TERTIARY, RESIDENTIAL, UNCLASSIFIED } }
+        /* Applied with functional classes:
+         *                         1,       2,         3,        4,        5 + rural,    5 + urban */
+	{   0 /*"DEFAULT"*/, { "", PRIMARY, SECONDARY, TERTIARY, TERTIARY, UNCLASSIFIED, RESIDENTIAL } },
+	{   3 /*"GER"*/, { "", PRIMARY, SECONDARY, TERTIARY, TERTIARY, UNCLASSIFIED, RESIDENTIAL } },
+	{ 108 /*"DEN"*/, { "", PRIMARY, SECONDARY, TERTIARY, TERTIARY, UNCLASSIFIED, RESIDENTIAL } },
+        { 107 /*"SWE"*/, { "", PRIMARY, SECONDARY, TERTIARY, TERTIARY, UNCLASSIFIED, RESIDENTIAL } }
 };
 
 

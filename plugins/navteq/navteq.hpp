@@ -49,6 +49,9 @@ osmium::unsigned_object_id_type g_osm_id = 1;
 // g_link_id_map maps navteq link_ids to a vector of osm_ids (it will mostly map to a single osm_id)
 link_id_map_type g_link_id_map;
 
+// g_route_type_map maps navteq link_ids to the lowest occurring route_type value
+link_id_route_type_map g_route_type_map;
+
 // g_hwys_ref_map maps navteq link_ids to a vector of highway names
 link_id_to_names_map g_hwys_ref_map;
 
@@ -169,8 +172,8 @@ link_id_type build_tag_list(ogr_feature_uptr& feat, osmium::builder::Builder* bu
         short z_level = -5) {
     osmium::builder::TagListBuilder tl_builder(buf, builder);
 
-    link_id_type link_id = parse_street_tags(&tl_builder, feat, &g_cdms_map, &g_cnd_mod_map, &g_area_to_govt_code_map,
-            &g_cntry_ref_map, &g_mtd_area_map);
+    link_id_type link_id = parse_street_tags(&tl_builder, feat, &g_cdms_map, &g_cnd_mod_map, 
+            &g_area_to_govt_code_map, &g_cntry_ref_map, &g_mtd_area_map, &g_route_type_map);
     
     //add tags for ref and int_ref to major highways
     add_highway_name_tags(&tl_builder, &g_hwys_ref_map, link_id);
@@ -748,8 +751,10 @@ void build_water_poly_taglist(osmium::builder::RelationBuilder& builder, ogr_lay
         const char* field_value = feat->GetFieldAsString(i);
         
         if (!strcmp(field_name, POLYGON_NM)) {
-            if(field_value && field_value[0])
-                tl_builder.add_tag("name", field_value);
+            if(field_value && field_value[0]) {
+                std::string waters_name = to_camel_case_with_spaces(field_value);
+                if (!waters_name.empty()) tl_builder.add_tag("name", waters_name);
+            }
         }
         
         if (!strcmp(field_name, FEAT_COD)) {
@@ -785,8 +790,10 @@ void build_water_way_taglist(osmium::builder::WayBuilder& builder, ogr_layer_upt
         const char* field_value = feat->GetFieldAsString(i);
         
         if (!strcmp(field_name, POLYGON_NM)) {
-            if(field_value && field_value[0])
-                tl_builder.add_tag("name", field_value);
+            if(field_value && field_value[0]) {
+                std::string waters_name = to_camel_case_with_spaces(field_value);
+                if (!waters_name.empty()) tl_builder.add_tag("name", waters_name);
+            }
         }
         
         if (!strcmp(field_name, FEAT_COD)) {
@@ -1317,6 +1324,30 @@ void process_way(ogr_layer_uptr_vector& layer_vector, z_lvl_map& z_level_map) {
         }
     }
 }
+/**
+ * \brief Parses AltStreets.dbf for route type values.
+ */
+void process_alt_steets_route_types(path_vector_type dirs) {
+    for (auto dir : dirs) {
+        DBFHandle alt_streets_handle = read_dbf_file(dir / ALT_STREETS_DBF);
+        for (int i = 0; i < DBFGetRecordCount(alt_streets_handle); i++) {
+
+            if (dbf_get_string_by_field(alt_streets_handle, i, ROUTE).empty())
+                continue;
+
+            osmium::unsigned_object_id_type link_id = dbf_get_uint_by_field(alt_streets_handle, i, LINK_ID);
+            ushort route_type = dbf_get_uint_by_field(alt_streets_handle, i, ROUTE);
+
+            if (g_route_type_map.find(link_id) == g_route_type_map.end()) {
+                g_route_type_map.insert(std::make_pair(link_id, route_type));
+            } else if (g_route_type_map.at(link_id) > route_type) {
+                //As link id's aren't unique in AltStreets.dbf
+                //just store the lowest route type
+                g_route_type_map[link_id] = route_type;
+            }
+        }
+    }
+}
 
 /****************************************************
  * adds layers to osmium:
@@ -1355,6 +1386,7 @@ void add_street_shapes(path_vector_type dirs, bool test = false) {
     g_area_to_govt_code_map.clear();
     g_cntry_ref_map.clear();
     g_z_lvl_nodes_map.clear();
+    g_route_type_map.clear();
 }
 
 void add_street_shapes(boost::filesystem::path dir, bool test = false) {
