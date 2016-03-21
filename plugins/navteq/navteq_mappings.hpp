@@ -21,6 +21,8 @@ static const boost::filesystem::path ADMINBNDY_4_SHP = "Adminbndy4.shp";
 static const boost::filesystem::path ADMINBNDY_5_SHP = "Adminbndy5.shp";
 static const boost::filesystem::path WATER_SEG_SHP = "WaterSeg.shp";
 static const boost::filesystem::path WATER_POLY_SHP = "WaterPoly.shp";
+static const boost::filesystem::path LAND_USE_A_SHP = "LandUseA.shp";
+static const boost::filesystem::path LAND_USE_B_SHP = "LandUseB.shp";
 
 static const boost::filesystem::path MTD_CNTRY_REF_DBF = "MtdCntryRef.dbf";
 static const boost::filesystem::path MTD_AREA_DBF = "MtdArea.dbf";

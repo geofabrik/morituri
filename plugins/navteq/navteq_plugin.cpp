@@ -137,6 +137,13 @@ void navteq_plugin::add_water() {
     }
 }
 
+void navteq_plugin::add_landuse() {
+    for (auto dir : dirs) {
+        if (shp_file_exists(dir / LAND_USE_A_SHP)) add_landuse_shape(dir / LAND_USE_A_SHP);
+        if (shp_file_exists(dir / LAND_USE_B_SHP)) add_landuse_shape(dir / LAND_USE_B_SHP);
+    }
+}
+
 void navteq_plugin::execute() {
 
     for (auto dir : dirs){
@@ -153,6 +160,8 @@ void navteq_plugin::execute() {
     add_administrative_boundaries();
     
     add_water();
+    
+    add_landuse();
     
     add_city_nodes(dirs);
 
