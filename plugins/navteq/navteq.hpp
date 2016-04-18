@@ -911,6 +911,11 @@ void build_landuse_taglist(osmium::builder::RelationBuilder& builder, ogr_layer_
                 // FEAT_TYPE 'ENVIRONMENTAL ZONE'
                 tl_builder.add_tag("boundary", "low_emission_zone");
                 tl_builder.add_tag("type", "boundary");
+            } 
+            // Unknown if Land Use A or B types, but seems to appear somewhere
+            else if (!strcmp(field_value, "509997")) {
+                // FEAT_TYPE 'GLACIER'
+                tl_builder.add_tag("natural", "glacier");
             } else {
                 std::cerr << "Skipping unknown landuse type " << field_value << " " << std::endl;
             }
@@ -1464,6 +1469,31 @@ void process_way(ogr_layer_uptr_vector& layer_vector, z_lvl_map& z_level_map) {
         }
     }
 }
+/**
+ * \brief Parses AltStreets.dbf for route type values.
+ */
+void process_alt_steets_route_types(path_vector_type dirs) {
+    for (auto dir : dirs) {
+        DBFHandle alt_streets_handle = read_dbf_file(dir / ALT_STREETS_DBF);
+        for (int i = 0; i < DBFGetRecordCount(alt_streets_handle); i++) {
+
+            if (dbf_get_string_by_field(alt_streets_handle, i, ROUTE).empty())
+                continue;
+
+            osmium::unsigned_object_id_type link_id = dbf_get_uint_by_field(alt_streets_handle, i, LINK_ID);
+            ushort route_type = dbf_get_uint_by_field(alt_streets_handle, i, ROUTE);
+
+            if (g_route_type_map.find(link_id) == g_route_type_map.end()) {
+                g_route_type_map.insert(std::make_pair(link_id, route_type));
+            } else if (g_route_type_map.at(link_id) > route_type) {
+                //As link id's aren't unique in AltStreets.dbf
+                //just store the lowest route type
+                g_route_type_map[link_id] = route_type;
+            }
+        }
+    }
+}
+
 /**
  * \brief Parses AltStreets.dbf for route type values.
  */
