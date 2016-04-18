@@ -10,13 +10,55 @@
 
 boost::filesystem::path g_executable_path;
 const boost::filesystem::path PLUGINS_NAVTEQ_ISO_639_2_UTF_8_TXT("plugins/navteq/ISO-639-2_utf-8.txt");
-
 int ctr = 0;
 
 // helper
 bool parse_bool(const char* value) {
     if (!strcmp(value, "Y")) return true;
     return false;
+}
+
+bool fits_street_ref(std::string& st_name) {
+    if (st_name.size() == 0) return false;
+    if (st_name.size() > 6) return false;
+    
+    bool number_started = false;
+    for (auto it = st_name.begin(); it != st_name.end(); ++it) {
+        if (std::isdigit(*it)) {
+             number_started = true;
+        } else if (number_started) {
+            return false;
+        }
+    }
+    
+    return number_started;
+}
+
+bool begins_with(std::string& str, const char* start_str) {
+    return ( strncmp(str.c_str(), start_str, strlen(start_str)) == 0 );
+}
+
+uint get_number_after(std::string& str, const char* start_str) {
+    if( !begins_with(str, start_str) )
+        return 0; /* doesn't start with start_str */
+    
+    /* Get number string after start_str until first non-digit appears */
+    std::string end_str = str.substr(strlen(start_str));
+    std::string number_str;
+    for (auto it = end_str.begin(); it != end_str.end(); ++it) {
+        if (std::isdigit(*it)) {
+            number_str += *it;
+        } else {
+            /* break because B107a should return 107*/
+            break;
+        }
+    }
+    
+    try {
+        return std::stoul( number_str );
+    } catch (const std::invalid_argument &) {
+        return 0;
+    }
 }
 
 bool is_motorized_allowed(ogr_feature_uptr& f) {
@@ -62,8 +104,40 @@ std::vector<std::string> get_hwy_vector(std::map<int, std::vector<std::string>> 
 	return hwy_route_type_vec;
 }
 
+std::string get_hwy_value(ushort route_type, uint area_code_1, std::string& ref_name) {
+    /* some exceptional cases for better route type parsing */
+    if (area_code_1 == 5 && route_type == 3) {          /*"BEL"*/
+         /* N# and N## is like PRIMARY
+          * N### SECONDARY
+          * N#### TERTIARY */
+        uint hwy_num = get_number_after(ref_name, "N");
+        if (hwy_num > 999)
+            return TERTIARY;
+        if (hwy_num > 99)
+            return SECONDARY;
+    } else if (area_code_1 == 9) {                      /*"AUT"*/
+        if (route_type == 4) {
+            // Type 4 streets named B### are primary otherwise secondary
+            if (!begins_with(ref_name, "B"))
+                return SECONDARY;
+        } else if (route_type == 5) {
+            // Type 5 streets named L### are secondary otherwise tertiary
+            if (begins_with(ref_name, "L"))
+                return SECONDARY;
+        }
+    } else if (area_code_1 == 23 && route_type == 2) {  /*"IRL"*/
+        /* N## is TRUNK if ## smaller 50 otherwise PRIMARY */
+        uint hwy_num = get_number_after(ref_name, "N");
+        if (hwy_num > 0 && hwy_num < 50)
+            return TRUNK;
+    }
+    
+    /* default case */
+    return get_hwy_vector(HWY_ROUTE_TYPE_MAP, area_code_1).at(route_type);
+}
+
 void add_highway_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f, link_id_type link_id,
-        ushort route_type, ushort func_class, mtd_area_map_type* mtd_area_map = nullptr) {
+        ushort route_type, ushort func_class, mtd_area_map_type* mtd_area_map = nullptr, std::string ref_name = "") {
     const char* highway = "highway";
     bool paved = parse_bool(get_field_from_feature(f, PAVED));
     bool motorized_allowed = is_motorized_allowed(f);
@@ -91,7 +165,7 @@ void add_highway_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr&
                 // controlled_access => motorway 
                 builder->add_tag(highway, MOTORWAY);
             } else if (route_type) {
-                std::string hwy_value = get_hwy_vector(HWY_ROUTE_TYPE_MAP, area_code_1).at(route_type);
+                std::string hwy_value = get_hwy_value(route_type, area_code_1, ref_name);
                 if (!hwy_value.empty()) {
                     builder->add_tag(highway, hwy_value);
                 } else {
@@ -234,22 +308,6 @@ bool is_imperial(area_id_type l_area_id, area_id_type r_area_id, area_id_govt_co
     return false;
 }
 
-bool fits_street_ref(std::string& st_name) {
-    if (st_name.size() == 0) return false;
-    if (st_name.size() > 6) return false;
-    
-    bool number_started = false;
-    for (auto it = st_name.begin(); it != st_name.end(); ++it) {
-        if (std::isdigit(*it)) {
-             number_started = true;
-        } else if (number_started) {
-            return false;
-        }
-    }
-    
-    return number_started;
-}
-
 void add_hazmat_tag(osmium::builder::TagListBuilder* builder, mod_val_type mod_val) {
     if (mod_val == 20) { // || mod_val == 21
         builder->add_tag("hazmat", "no");
@@ -263,6 +321,8 @@ void add_hazmat_tag(osmium::builder::TagListBuilder* builder, mod_val_type mod_v
         builder->add_tag("hazmat:D", "no");
     } else if (mod_val == 34) {
         builder->add_tag("hazmat:E", "no");
+    } else if (mod_val == 23) {
+         /* 23 = Explosive and Flammable */
     } else {
         /**
          * Do nothing for the residual values,
@@ -276,7 +336,6 @@ void add_hazmat_tag(osmium::builder::TagListBuilder* builder, mod_val_type mod_v
          * 7 = Radioactive
          * 8 = Corrosive
          * 9 = Other
-         * 23 = Explosive and Flammable
          */
         std::cerr << "Hazardous material value " << mod_val << " hasn't been parsed!" << std::endl;
     }
@@ -387,14 +446,38 @@ void add_postcode_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr
 	builder->add_tag("addr:postcode", postcode);
 }
 
+std::string add_highway_name_tags(osmium::builder::TagListBuilder *builder, link_id_to_names_map* names_map, link_id_type link_id) {
+    std::string ref_tag;
+    if (names_map->find(link_id) != names_map->end()) {
+        std::vector<std::string> &highway_names_vector = names_map->at(link_id);
+        std::string int_ref_tag;
+       
+        for (auto it : highway_names_vector) {
+            
+            if (ref_tag.empty() || !ref_tag.compare(0, 1, "E"))
+                ref_tag = it;
+            
+            if (!it.compare(0, 1, "E"))
+                int_ref_tag = it;
+             
+            //TODO add to int_ref if way is asian highway ("AH")
+        }
+        
+        if (!ref_tag.empty()) builder->add_tag("ref", ref_tag.c_str());
+        if (!int_ref_tag.empty()) builder->add_tag("int_ref", int_ref_tag.c_str());    
+    }
+    
+    return ref_tag;
+}
+
 void add_highway_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f, link_id_type link_id,
-		ushort route_type, mtd_area_map_type* mtd_area_map = nullptr) {
+		ushort route_type, mtd_area_map_type* mtd_area_map = nullptr, std::string ref_name = "") {
 
 	ushort func_class = 0;
 	std::string func_class_s = get_field_from_feature(f, FUNC_CLASS);
 	if (!func_class_s.empty()) func_class = get_uint_from_feature(f, FUNC_CLASS);
 	
-        add_highway_tag(builder, f, link_id, route_type, func_class, mtd_area_map);
+        add_highway_tag(builder, f, link_id, route_type, func_class, mtd_area_map, ref_name);
 
 	add_one_way_tag(builder, get_field_from_feature(f, DIR_TRAVEL));
 	add_access_tags(builder, f);
@@ -417,8 +500,8 @@ void add_highway_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr
 link_id_type parse_street_tags(osmium::builder::TagListBuilder *builder, ogr_feature_uptr& f, cdms_map_type* cdms_map =
         nullptr, cnd_mod_map_type* cnd_mod_map = nullptr, area_id_govt_code_map_type* area_govt_map = nullptr,
 		cntry_ref_map_type* cntry_map = nullptr, mtd_area_map_type* mtd_area_map = nullptr,
-                link_id_route_type_map* route_type_map = nullptr) {
-    
+                link_id_route_type_map* route_type_map = nullptr, link_id_to_names_map* names_map = nullptr) {
+
     const char* link_id_s = get_field_from_feature(f, LINK_ID);
     link_id_type link_id = std::stoul(link_id_s);
     builder->add_tag(LINK_ID, link_id_s); // tag for debug purpose
@@ -429,6 +512,9 @@ link_id_type parse_street_tags(osmium::builder::TagListBuilder *builder, ogr_fea
     if ( route_type_map->find(link_id) != route_type_map->end()
             && ( !route_type || route_type_map->at(link_id) < route_type ))
         route_type = route_type_map->at(link_id);
+        
+    //add tags for ref and int_ref to major highways
+    std::string ref_name = add_highway_name_tags(builder, names_map, link_id);
 
     std::string street_name = to_camel_case_with_spaces(get_field_from_feature(f, ST_NAME));
     if (!street_name.empty())
@@ -436,47 +522,27 @@ link_id_type parse_street_tags(osmium::builder::TagListBuilder *builder, ogr_fea
     if (is_ferry(get_field_from_feature(f, FERRY))) {
         add_ferry_tag(builder, f);
     } else {  // usual highways
-        add_highway_tags(builder, f, link_id, route_type, mtd_area_map);
+        add_highway_tags(builder, f, link_id, route_type, mtd_area_map, ref_name);
     }
 
     area_id_type l_area_id = get_uint_from_feature(f, L_AREA_ID);
     area_id_type r_area_id = get_uint_from_feature(f, R_AREA_ID);
     // tags which apply to highways and ferry routes
-    add_additional_restrictions(builder, link_id, l_area_id, r_area_id, cdms_map, 
-            cnd_mod_map, area_govt_map, cntry_map);
+    add_additional_restrictions(builder, link_id, l_area_id, r_area_id, cdms_map, cnd_mod_map, area_govt_map,
+            cntry_map);
     add_here_speed_cat_tag(builder, f);
     if (parse_bool(get_field_from_feature(f, TOLLWAY))) builder->add_tag("here:tollway", YES);
     if (parse_bool(get_field_from_feature(f, URBAN))) builder->add_tag("here:urban", YES);
     if (parse_bool(get_field_from_feature(f, CONTRACC))) builder->add_tag("here:controll_access", YES);
-    
     if (route_type) add_uint_tag(builder, "here:route_type", route_type);
+
+
     std::string func_class = get_field_from_feature(f, FUNC_CLASS);
     if (!func_class.empty()) builder->add_tag("here:func_class", func_class.c_str());
 
-
+    add_uint_tag(builder, "here:area_code", get_area_code_l(f, mtd_area_map));
+    
     return link_id;
-}
-
-void add_highway_name_tags(osmium::builder::TagListBuilder *builder, link_id_to_names_map* names_map, link_id_type link_id) {
-    if (names_map->find(link_id) != names_map->end()) {
-        std::vector<std::string> &highway_names_vector = names_map->at(link_id);
-        std::string ref_tag;
-        std::string int_ref_tag;
-       
-        for (auto it : highway_names_vector) {
-            
-            if (ref_tag.empty() || !ref_tag.compare(0, 1, "E"))
-                ref_tag = it;
-            
-            if (!it.compare(0, 1, "E"))
-                int_ref_tag = it;
-             
-            //TODO add to int_ref if way is asian highway ("AH")
-        }
-        
-        if (!ref_tag.empty()) builder->add_tag("ref", ref_tag.c_str());
-        if (!int_ref_tag.empty()) builder->add_tag("int_ref", int_ref_tag.c_str());    
-    }
 }
 
 const char* get_place_value(uint population, uint capital) {
