@@ -173,10 +173,7 @@ link_id_type build_tag_list(ogr_feature_uptr& feat, osmium::builder::Builder* bu
     osmium::builder::TagListBuilder tl_builder(buf, builder);
 
     link_id_type link_id = parse_street_tags(&tl_builder, feat, &g_cdms_map, &g_cnd_mod_map, 
-            &g_area_to_govt_code_map, &g_cntry_ref_map, &g_mtd_area_map, &g_route_type_map);
-    
-    //add tags for ref and int_ref to major highways
-    add_highway_name_tags(&tl_builder, &g_hwys_ref_map, link_id);
+            &g_area_to_govt_code_map, &g_cntry_ref_map, &g_mtd_area_map, &g_route_type_map, &g_hwys_ref_map);
 
     if (z_level != -5 && z_level != 0) tl_builder.add_tag("layer", std::to_string(z_level).c_str());
     if (link_id == 0) throw(format_error("layers column field '" + std::string(LINK_ID) + "' is missing"));
@@ -188,7 +185,7 @@ link_id_type build_tag_list(ogr_feature_uptr& feat, osmium::builder::Builder* bu
  * \param location Location of Node being created.
  * \param builder NodeBuilder to create Node.
  * \return id of created Node.
- * */
+ */
 osmium::unsigned_object_id_type build_node(osmium::Location location, osmium::builder::NodeBuilder* builder) {
     assert(builder != nullptr);
     STATIC_NODE(builder->object()).set_id(g_osm_id++);
@@ -202,19 +199,29 @@ osmium::unsigned_object_id_type build_node(osmium::Location location, osmium::bu
  * \brief creates Node and writes it to m_buffer.
  * \param location Location of Node being created.
  * \return id of created Node.
- * */
+ */
 osmium::unsigned_object_id_type build_node(osmium::Location location) {
     osmium::builder::NodeBuilder builder(g_node_buffer);
     return build_node(location, &builder);
 }
 
-osmium::unsigned_object_id_type build_node_with_tag(osmium::Location location, const char* tag_key,
-        const char* tag_val) {
+/**
+ * \brief creates Node with tags and writes it to m_buffer.
+ * \param location Location of Node being created.
+ * \param kv_vector holds tags as key value pairs
+ * \return id of created Node.
+ */
+osmium::unsigned_object_id_type build_node_with_tags(osmium::Location location, const std::vector<key_val_pair_type>& kv_vector) {
     osmium::builder::NodeBuilder node_builder(g_node_buffer);
     auto node_id = build_node(location, &node_builder);
-    if (tag_key) {
-        osmium::builder::TagListBuilder tl_builder(g_node_buffer, &node_builder);
-        tl_builder.add_tag(tag_key, tag_val);
+
+    osmium::builder::TagListBuilder tl_builder(g_node_buffer, &node_builder);
+    for (auto kv_pair : kv_vector){
+		auto tag_key = kv_pair.first;
+		auto tag_val = kv_pair.second;
+		if (tag_key) {
+			tl_builder.add_tag(tag_key, tag_val);
+		}
     }
     return node_id;
 }
@@ -530,6 +537,12 @@ void set_ferry_z_lvls_to_zero(ogr_feature_uptr& feat, index_z_lvl_vector_type& z
         z_lvl_vec.erase(z_lvl_vec.end());
 }
 
+/**
+ * \brief creates interpolated house numbers alongside of a given linestring if feature holds suitable tags
+ * \param feat feature which holds the tags
+ * \param ogr_ls linestring which receives the interpolated house numbers
+ * \param left specifies on which side of the linestring the house numbers will be applied
+ */
 void create_house_numbers(ogr_feature_uptr& feat, ogr_line_string_uptr& ogr_ls, bool left) {
     const char* ref_addr = left ? L_REFADDR : R_REFADDR;
     const char* nref_addr = left ? L_NREFADDR : R_NREFADDR;
@@ -540,7 +553,7 @@ void create_house_numbers(ogr_feature_uptr& feat, ogr_line_string_uptr& ogr_ls, 
     if (!strcmp(get_field_from_feature(feat, addr_schema), "")) return;
     if (!strcmp(get_field_from_feature(feat, addr_schema), "M")) return;
 
-    ogr_line_string_uptr offset_ogr_ls(create_offset_curve(ogr_ls.get(), 0.00005, left));
+	ogr_line_string_uptr offset_ogr_ls(create_offset_curve(ogr_ls.get(), HOUSENUMBER_CURVE_OFFSET, left));
     assert(ogr_ls);
     osmium::builder::WayBuilder way_builder(g_way_buffer);
     STATIC_WAY(way_builder.object()).set_id(g_osm_id++);
@@ -550,15 +563,17 @@ void create_house_numbers(ogr_feature_uptr& feat, ogr_line_string_uptr& ogr_ls, 
     for (int i = 0; i < offset_ogr_ls->getNumPoints(); i++) {
         osmium::Location location(offset_ogr_ls->getX(i), offset_ogr_ls->getY(i));
         assert(location.valid());
-        osmium::unsigned_object_id_type node_id;
-        if (i == 0) {
-            node_id = build_node_with_tag(location, "addr:housenumber", get_field_from_feature(feat, ref_addr));
-        } else if (i == offset_ogr_ls->getNumPoints() - 1) {
-            node_id = build_node_with_tag(location, "addr:housenumber", get_field_from_feature(feat, nref_addr));
-        } else {
-            node_id = build_node(location);
-        }
 
+        std::vector<key_val_pair_type> tags;
+        if (i == 0 || i == offset_ogr_ls->getNumPoints() - 1){
+			if (i == 0){
+				tags.push_back(key_val_pair_type("addr:housenumber", get_field_from_feature(feat, left ? ref_addr : nref_addr)));
+			} else if (i == offset_ogr_ls->getNumPoints() - 1) {
+				tags.push_back(key_val_pair_type("addr:housenumber", get_field_from_feature(feat, left ? nref_addr : ref_addr)));
+			}
+			tags.push_back(key_val_pair_type("addr:street", to_camel_case_with_spaces(get_field_from_feature(feat, ST_NAME)).c_str()));
+        }
+        osmium::unsigned_object_id_type node_id = build_node_with_tags(location, tags);
         wnl_builder.add_node_ref(osmium::NodeRef(node_id, location));
     }
     {
@@ -716,7 +731,7 @@ void build_admin_boundary_taglist(osmium::builder::RelationBuilder& builder, ogr
         const char* field_name = po_field_defn->GetNameRef();
         const char* field_value = feat->GetFieldAsString(i);
         // admin boundary mapping: see NAVSTREETS Street Data Reference Manual: p.947)
-        if (!strcmp(field_name, "AREA_ID")) {
+        if (!strcmp(field_name, AREA_ID)) {
             osmium::unsigned_object_id_type area_id = std::stoi(field_value);
             if (g_mtd_area_map.find(area_id) != g_mtd_area_map.end()) {
                 auto d = g_mtd_area_map.at(area_id);
@@ -731,6 +746,11 @@ void build_admin_boundary_taglist(osmium::builder::RelationBuilder& builder, ogr
             } else {
                 std::cerr << "Skipping unknown navteq_admin_level" << std::endl;
             }
+        } else if (!strcmp(field_name, FEAT_COD)) {
+            osmium::unsigned_object_id_type feat_code = std::stoi(field_value);
+            // FEAT_TYPE 'SETTLEMENT'
+            if (feat_code = 900156)
+                tl_builder.add_tag("landuse", "residential");
         }
     }
 }
@@ -857,6 +877,9 @@ void build_landuse_taglist(osmium::builder::RelationBuilder& builder, ogr_layer_
             } else if (!strcmp(field_value, "900150")) {
                 // FEAT_TYPE 'PARK (CITY/COUNTY)'
                 tl_builder.add_tag("leisure", "park");
+            } else if (!strcmp(field_value, "900159")) {
+                // FEAT_TYPE 'UNDEFINED TRAFFIC AREA'
+                // Possible handling: area=yes, highway=pedestrian
             } else if (!strcmp(field_value, "900202")) {
                 // FEAT_TYPE 'WOODLAND'
                 tl_builder.add_tag("landuse", "forest");
@@ -911,6 +934,11 @@ void build_landuse_taglist(osmium::builder::RelationBuilder& builder, ogr_layer_
                 // FEAT_TYPE 'ENVIRONMENTAL ZONE'
                 tl_builder.add_tag("boundary", "low_emission_zone");
                 tl_builder.add_tag("type", "boundary");
+            } 
+            // Unknown if Land Use A or B types, but seems to appear somewhere
+            else if (!strcmp(field_value, "509997")) {
+                // FEAT_TYPE 'GLACIER'
+                tl_builder.add_tag("natural", "glacier");
             } else {
                 std::cerr << "Skipping unknown landuse type " << field_value << " " << std::endl;
             }
@@ -1135,6 +1163,12 @@ void process_meta_areas(boost::filesystem::path dir, bool test = false) {
         g_mtd_area_map.insert(std::make_pair(area_id, data));
     }
     DBFClose(handle);
+}
+
+void preprocess_meta_areas(path_vector_type dirs, bool test = false) {
+    for (auto dir : dirs){
+        process_meta_areas(dir);
+    }
 }
 
 link_id_vector_type collect_via_manoeuvre_link_ids(link_id_type link_id, DBFHandle rdms_handle,
@@ -1400,22 +1434,25 @@ void init_country_reference(const boost::filesystem::path& dir, std::ostream& ou
     }
 }
 
-void init_major_highway_names(const boost::filesystem::path& dir, std::ostream& out) {
-    if (dbf_file_exists(dir / MAJ_HWYS_DBF)) {
-        DBFHandle maj_hwys_handle = read_dbf_file(dir / MAJ_HWYS_DBF);
-        for (int i = 0; i < DBFGetRecordCount(maj_hwys_handle); i++) {
+void parse_highway_names(const boost::filesystem::path& dbf_file ) {
+    DBFHandle maj_hwys_handle = read_dbf_file(dbf_file);
+    for (int i = 0; i < DBFGetRecordCount(maj_hwys_handle); i++) {
 
-            link_id_type link_id = dbf_get_uint_by_field(maj_hwys_handle, i, LINK_ID);
-            std::string hwy_name = dbf_get_string_by_field(maj_hwys_handle, i, HIGHWAY_NM);
+        link_id_type link_id = dbf_get_uint_by_field(maj_hwys_handle, i, LINK_ID);
+        std::string hwy_name = dbf_get_string_by_field(maj_hwys_handle, i, HIGHWAY_NM);
 
-            if (!fits_street_ref(hwy_name)) continue;
-            
-            if (g_hwys_ref_map.find(link_id) == g_hwys_ref_map.end())
-                g_hwys_ref_map.insert(std::make_pair(link_id, std::vector<std::string>()));
-            g_hwys_ref_map.at(link_id).push_back(hwy_name);
-        }
-        DBFClose(maj_hwys_handle);
+        if (!fits_street_ref(hwy_name)) continue;
+
+        if (g_hwys_ref_map.find(link_id) == g_hwys_ref_map.end())
+            g_hwys_ref_map.insert(std::make_pair(link_id, std::vector<std::string>()));
+        g_hwys_ref_map.at(link_id).push_back(hwy_name);
     }
+    DBFClose(maj_hwys_handle);
+}
+
+void init_highway_names(const boost::filesystem::path& dir, std::ostream& out) {
+    if (dbf_file_exists(dir / MAJ_HWYS_DBF)) parse_highway_names(dir / MAJ_HWYS_DBF);
+    if (dbf_file_exists(dir / SEC_HWYS_DBF)) parse_highway_names(dir / SEC_HWYS_DBF);
 }
 
 z_lvl_map process_z_levels(const path_vector_type& dirs, ogr_layer_uptr_vector& layer_vector, std::ostream& out) {
@@ -1429,7 +1466,7 @@ z_lvl_map process_z_levels(const path_vector_type& dirs, ogr_layer_uptr_vector& 
         init_z_level_map(dir, out, z_level_map);
         init_conditional_driving_manoeuvres(dir, out);
         init_country_reference(dir, out);
-        init_major_highway_names(dir, out);
+        init_highway_names(dir, out);
     }
     return z_level_map;
 }
@@ -1464,6 +1501,7 @@ void process_way(ogr_layer_uptr_vector& layer_vector, z_lvl_map& z_level_map) {
         }
     }
 }
+
 /**
  * \brief Parses AltStreets.dbf for route type values.
  */

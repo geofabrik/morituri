@@ -48,6 +48,7 @@ bool navteq_plugin::check_files(boost::filesystem::path dir) {
     if (!dbf_file_exists(dir / CDMS_DBF     )) return false;
     if (!dbf_file_exists(dir / ZLEVELS_DBF  )) return false;
     if (!dbf_file_exists(dir / MAJ_HWYS_DBF )) return false;
+    if (!dbf_file_exists(dir / SEC_HWYS_DBF )) return false;
     if (!dbf_file_exists(dir / NAMED_PLC_DBF)) return false;
     if (!dbf_file_exists(dir / ALT_STREETS_DBF)) return false;
 
@@ -146,10 +147,8 @@ void navteq_plugin::add_landuse() {
 
 void navteq_plugin::execute() {
 
-    for (auto dir : dirs){
-        process_meta_areas(dir);
-    }
-    
+    preprocess_meta_areas(dirs);
+
     process_alt_steets_route_types(dirs);
     add_street_shapes(dirs);
     assert__id_uniqueness();
