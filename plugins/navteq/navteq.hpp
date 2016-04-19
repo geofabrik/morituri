@@ -731,7 +731,7 @@ void build_admin_boundary_taglist(osmium::builder::RelationBuilder& builder, ogr
         const char* field_name = po_field_defn->GetNameRef();
         const char* field_value = feat->GetFieldAsString(i);
         // admin boundary mapping: see NAVSTREETS Street Data Reference Manual: p.947)
-        if (!strcmp(field_name, "AREA_ID")) {
+        if (!strcmp(field_name, AREA_ID)) {
             osmium::unsigned_object_id_type area_id = std::stoi(field_value);
             if (g_mtd_area_map.find(area_id) != g_mtd_area_map.end()) {
                 auto d = g_mtd_area_map.at(area_id);
@@ -746,6 +746,11 @@ void build_admin_boundary_taglist(osmium::builder::RelationBuilder& builder, ogr
             } else {
                 std::cerr << "Skipping unknown navteq_admin_level" << std::endl;
             }
+        } else if (!strcmp(field_name, FEAT_COD)) {
+            osmium::unsigned_object_id_type feat_code = std::stoi(field_value);
+            // FEAT_TYPE 'SETTLEMENT'
+            if (feat_code = 900156)
+                tl_builder.add_tag("landuse", "residential");
         }
     }
 }

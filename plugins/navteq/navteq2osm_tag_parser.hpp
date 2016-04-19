@@ -558,7 +558,11 @@ const char* get_place_value(uint population, uint capital) {
             || population > 100)
         return "village";
     
-    return "hamlet";
+    if ( population > 0 )
+        return "hamlet";
+    
+    //population = 0 is more often a village than a hamlet
+    return "village";
 }
 
 // matching from http://www.loc.gov/standards/iso639-2/php/code_list.php
