@@ -571,7 +571,7 @@ void create_house_numbers(ogr_feature_uptr& feat, ogr_line_string_uptr& ogr_ls, 
 			} else if (i == offset_ogr_ls->getNumPoints() - 1) {
 				tags.push_back(key_val_pair_type("addr:housenumber", get_field_from_feature(feat, left ? nref_addr : ref_addr)));
 			}
-			tags.push_back(key_val_pair_type("addr:street", to_camel_case_with_spaces(get_field_from_feature(feat, ST_NAME)).c_str()));
+			tags.push_back(key_val_pair_type("addr:street", strdup(to_camel_case_with_spaces(get_field_from_feature(feat, ST_NAME)).c_str())));
         }
         osmium::unsigned_object_id_type node_id = build_node_with_tags(location, tags);
         wnl_builder.add_node_ref(osmium::NodeRef(node_id, location));
