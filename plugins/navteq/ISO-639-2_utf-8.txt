@@ -179,6 +179,7 @@ hit|||Hittite|hittite
 hmn|||Hmong; Mong|hmong
 hmo||ho|Hiri Motu|hiri motu
 hrv||hr|Croatian|croate
+scr||hr|Croatian|croate
 hsb|||Upper Sorbian|haut-sorabe
 hun||hu|Hungarian|hongrois
 hup|||Hupa|hupa
@@ -283,9 +284,11 @@ mkh|||Mon-Khmer languages|môn-khmer, langues
 mlg||mg|Malagasy|malgache
 mlt||mt|Maltese|maltais
 mnc|||Manchu|mandchou
+mne||me|Montenegrin|monténégrin
 mni|||Manipuri|manipuri
 mno|||Manobo languages|manobo, langues
 moh|||Mohawk|mohawk
+mol||mo|Moldavian; Moldavan|moldave
 mon||mn|Mongolian|mongol
 mos|||Mossi|moré
 mul|||Multiple languages|multilingue
@@ -401,6 +404,7 @@ sot||st|Sotho, Southern|sotho du Sud
 spa||es|Spanish; Castilian|espagnol; castillan
 srd||sc|Sardinian|sarde
 srn|||Sranan Tongo|sranan tongo
+srb||sr|Serbian|serbe
 srp||sr|Serbian|serbe
 srr|||Serer|sérère
 ssa|||Nilo-Saharan languages|nilo-sahariennes, langues
