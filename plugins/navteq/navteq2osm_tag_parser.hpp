@@ -104,9 +104,18 @@ std::vector<std::string> get_hwy_vector(std::map<int, std::vector<std::string>> 
 	return hwy_route_type_vec;
 }
 
-std::string get_hwy_value(ushort route_type, uint area_code_1, std::string& ref_name) {
+std::string get_hwy_value(ushort route_type, ushort func_class, uint area_code_1, std::string& ref_name) {
     /* some exceptional cases for better route type parsing */
-    if (area_code_1 == 5 && route_type == 3) {          /*"BEL"*/
+    if (area_code_1 == 2 && route_type == 4) {              /*"FRA"*/
+         /* Too many different highways have route type 4
+          * so we also take functional class into consideration */
+        if (func_class == 2)
+            return PRIMARY;
+        else if (func_class == 3)
+            return SECONDARY;
+        else if (func_class > 3)
+            return TERTIARY;
+    } if (area_code_1 == 5 && route_type == 3) {            /*"BEL"*/
          /* N# and N## is like PRIMARY
           * N### SECONDARY
           * N#### TERTIARY */
@@ -115,7 +124,7 @@ std::string get_hwy_value(ushort route_type, uint area_code_1, std::string& ref_
             return TERTIARY;
         if (hwy_num > 99)
             return SECONDARY;
-    } else if (area_code_1 == 9) {                      /*"AUT"*/
+    } else if (area_code_1 == 9) {                          /*"AUT"*/
         if (route_type == 4) {
             // Type 4 streets named B### are primary otherwise secondary
             if (!begins_with(ref_name, "B"))
@@ -130,8 +139,16 @@ std::string get_hwy_value(ushort route_type, uint area_code_1, std::string& ref_
         uint hwy_num = get_number_after(ref_name, "N");
         if (hwy_num > 0 && hwy_num < 50)
             return TRUNK;
+    } else if (area_code_1 == 109 || area_code_1 == 110     /*UK - Wales*/      /*UK - England*/
+            || area_code_1 == 112 || area_code_1 == 22 ) {  /*UK - Scotland*/   /*UK - Northern Ireland*/
+        /* Differ between white and green shield A-Roads */
+        if(route_type == 2) {
+            if(func_class == 2 || func_class == 1)
+                return TRUNK;
+            else
+                return PRIMARY;
+        }
     }
-    
     /* default case */
     return get_hwy_vector(HWY_ROUTE_TYPE_MAP, area_code_1).at(route_type);
 }
@@ -165,7 +182,7 @@ void add_highway_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr&
                 // controlled_access => motorway 
                 builder->add_tag(highway, MOTORWAY);
             } else if (route_type) {
-                std::string hwy_value = get_hwy_value(route_type, area_code_1, ref_name);
+                std::string hwy_value = get_hwy_value(route_type, func_class, area_code_1, ref_name);
                 if (!hwy_value.empty()) {
                     builder->add_tag(highway, hwy_value);
                 } else {
@@ -180,7 +197,7 @@ void add_highway_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr&
                 
                 builder->add_tag(highway, hwy_func_class_vec.at(apply_func_class));
             } else {
-                std::cerr << " highway misses route_type and func_class! ";
+                std::cerr << " highway misses route_type and func_class! " << std::endl;
             }
         }
     }
@@ -360,11 +377,15 @@ void add_additional_restrictions(osmium::builder::TagListBuilder* builder, link_
 	std::vector<mod_group_type> mod_group_vector;
 	auto range = cdms_map->equal_range(link_id);
 	for (auto it = range.first; it != range.second; ++it) {
-		cond_id_type cond_id = it->second;
-		auto it2 = cnd_mod_map->find(cond_id);
+                cond_pair_type cond = it->second;
+                if(cond.second == CT_RESTRICTED_DRIVING_MANOEUVRE
+                        || cond.second == CT_TRANSPORT_RESTRICTED_DRIVING_MANOEUVRE)
+                    continue; //TODO RESTRICTED_DRIVING_MANOEUVRE should apply as conditional turn restriction but not for current link id
+		auto it2 = cnd_mod_map->find(cond.first);
 		if (it2 != cnd_mod_map->end()) {
-			auto mod_group = it2->second;
+                    for (auto mod_group : it2->second) {
 			mod_group_vector.push_back(mod_group);
+                    }
 		}
 	}
 

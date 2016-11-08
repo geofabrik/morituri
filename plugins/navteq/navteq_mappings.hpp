@@ -23,6 +23,7 @@ static const boost::filesystem::path WATER_SEG_SHP = "WaterSeg.shp";
 static const boost::filesystem::path WATER_POLY_SHP = "WaterPoly.shp";
 static const boost::filesystem::path LAND_USE_A_SHP = "LandUseA.shp";
 static const boost::filesystem::path LAND_USE_B_SHP = "LandUseB.shp";
+static const boost::filesystem::path RAIL_ROADS_SHP = "RailRds.shp";
 
 static const boost::filesystem::path MTD_CNTRY_REF_DBF = "MtdCntryRef.dbf";
 static const boost::filesystem::path MTD_AREA_DBF = "MtdArea.dbf";
@@ -128,6 +129,7 @@ const char* POLYGON_NM = "POLYGON_NM";
 const char* FEAT_COD = "FEAT_COD";
 
 // condition types (CT)
+#define CT_RESTRICTED_DRIVING_MANOEUVRE 7
 #define CT_TRANSPORT_ACCESS_RESTRICTION 23
 #define CT_TRANSPORT_RESTRICTED_DRIVING_MANOEUVRE 26
 
@@ -191,29 +193,29 @@ const char* FOOTWAY = "footway";
 std::map<int, std::vector<std::string>> const HWY_ROUTE_TYPE_MAP = {
 	{   0 /*"DEFAULT"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
 	{   1 /*"ITA"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, "", "" } },
-        {   2 /*"FRA"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
-	{   3 /*"GER"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } }, // tested
-	{   5 /*"BEL"*/, { "", TRUNK, TRUNK, PRIMARY, "", "", PRIMARY } },          //exceptional handling for type 3
+        {   2 /*"FRA"*/, { "", TRUNK, TRUNK, TRUNK, SECONDARY, TERTIARY, UNCLASSIFIED } },      //exceptional handling for type 4
+	{   3 /*"GER"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },// tested
+	{   5 /*"BEL"*/, { "", TRUNK, TRUNK, PRIMARY, "", "", PRIMARY } },                      //exceptional handling for type 3
         {   6 /*"NLD"*/, { "", TRUNK, TRUNK, PRIMARY, "", "", SECONDARY } },
       //{   6 /*"???"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
 	{   7 /*"LUX"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, "", "" } },
         {   8 /*"CHE"*/, { "", TRUNK, TRUNK, PRIMARY, "", "", "" } },
-        {   9 /*"AUT"*/, { "", TRUNK, TRUNK, TRUNK, PRIMARY, TERTIARY, "" } },      //exceptional handling for type 4 and 5 
+        {   9 /*"AUT"*/, { "", TRUNK, TRUNK, TRUNK, PRIMARY, TERTIARY, "" } },                  //exceptional handling for type 4 and 5 
       //{ 15 /*"LIE"*/, { "", "", "", PRIMARY, "", "", "" } },
         {  18 /*"ESP"*/, { "", TRUNK, TRUNK, PRIMARY, PRIMARY, SECONDARY, TERTIARY } },
         {  19 /*"???"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
         /* 22 - for 22 (northern Ireland) look after UK entries after 112 */
-        {  23 /*"IRL"*/, { "", TRUNK, PRIMARY, SECONDARY, TERTIARY, "", "", "" } }, //exceptional handling for type 2
+        {  23 /*"IRL"*/, { "", TRUNK, PRIMARY, SECONDARY, TERTIARY, "", "", "" } },             //exceptional handling for type 2
 	{  30 /*"HUN"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, "", "" } },
         {  43 /*"POL"*/, { "", TRUNK, TRUNK, TRUNK, PRIMARY, SECONDARY, TERTIARY } },
         { 107 /*"SWE"*/, { "", TRUNK, PRIMARY, SECONDARY, "", "", "", ""} },
 	{ 108 /*"DEN"*/, { "", TRUNK, PRIMARY, SECONDARY, "", "", ""} },
         /* NOTE: Meaning of routeType 2 in UK depends on color of A-road sign (green=trunk, white=primary)
          * But it seems there is no way to distinguish both types */
-	{ 109 /*UK - Wales*/, { "", TRUNK, PRIMARY, SECONDARY, "", "", "", "" } },
-	{ 110 /*UK - England*/, { "", TRUNK, PRIMARY, SECONDARY, "", "", "", "" } },
-	{ 112 /*UK - Scotland*/, { "", TRUNK, PRIMARY, SECONDARY, "", "", "", "" } },
-	{  22 /*UK - Northern Ireland*/, { "", TRUNK, TRUNK, SECONDARY, "", "", "", "" } }, //Northern Ireland has no white A-roads shields
+	{ 109 /*UK - Wales*/, { "", TRUNK, PRIMARY, SECONDARY, "", "", "", "" } },              //exceptional handling for type 2
+	{ 110 /*UK - England*/, { "", TRUNK, PRIMARY, SECONDARY, "", "", "", "" } },            //exceptional handling for type 2
+	{ 112 /*UK - Scotland*/, { "", TRUNK, PRIMARY, SECONDARY, "", "", "", "" } },           //exceptional handling for type 2
+	{  22 /*UK - Northern Ireland*/, { "", TRUNK, PRIMARY, SECONDARY, "", "", "", "" } },   //exceptional handling for type 2
 	{ 120 /*"NOR"*/, { "", TRUNK, PRIMARY, SECONDARY, TERTIARY, "", "" } },
 	{ 123 /*Isle Of Man*/, { "", TRUNK, PRIMARY, SECONDARY, TERTIARY, "", "", "" } },
 	{ 124 /*Channel Island*/, { "", TRUNK, PRIMARY, SECONDARY, TERTIARY, "", "", "" } },

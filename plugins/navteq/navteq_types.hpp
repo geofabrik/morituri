@@ -19,9 +19,11 @@
 typedef std::vector<boost::filesystem::path> path_vector_type;
 
 typedef uint64_t cond_id_type;
+typedef uint64_t cond_type_type;
+typedef std::pair<cond_id_type, cond_type_type> cond_pair_type;
+
 typedef uint64_t mod_typ_type;
 typedef uint64_t mod_val_type;
-
 typedef std::pair<mod_typ_type, mod_val_type> mod_pair_type;
 
 struct cntry_ref_type {
@@ -80,10 +82,11 @@ struct mtd_area_dataset {
 
 typedef std::map<osmium::unsigned_object_id_type, mtd_area_dataset> mtd_area_map_type;
 
-typedef std::unordered_map<cond_id_type, mod_group_type> cnd_mod_map_type;
+typedef std::vector<mod_group_type> mod_group_vector_type;
+typedef std::unordered_map<cond_id_type, mod_group_vector_type> cnd_mod_map_type;
 
 typedef uint64_t link_id_type;
-typedef std::multimap<link_id_type, cond_id_type> cdms_map_type;
+typedef std::multimap<link_id_type, cond_pair_type> cdms_map_type;
 
 // vector of osm_ids
 typedef std::vector<osmium::unsigned_object_id_type> osm_id_vector_type;

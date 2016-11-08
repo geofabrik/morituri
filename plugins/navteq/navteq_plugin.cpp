@@ -155,6 +155,8 @@ void navteq_plugin::execute() {
 
     add_turn_restrictions(dirs);
     assert__id_uniqueness();
+    
+    add_rail_roads(dirs);
 
     add_administrative_boundaries();
     
