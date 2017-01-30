@@ -78,10 +78,7 @@ bool is_motorized_allowed(ogr_feature_uptr& f) {
     return false;
 }
 
-uint get_area_code_l(ogr_feature_uptr& f, mtd_area_map_type* mtd_area_map = nullptr) {
-    area_id_type l_area_id = get_uint_from_feature(f, L_AREA_ID);
-    area_id_type r_area_id = get_uint_from_feature(f, R_AREA_ID);
-
+uint get_area_code_l(area_id_type l_area_id, area_id_type r_area_id, mtd_area_map_type* mtd_area_map = nullptr) {
     area_id_type area_id;
     if (mtd_area_map->find(l_area_id) != mtd_area_map->end())
         area_id = l_area_id;
@@ -93,13 +90,19 @@ uint get_area_code_l(ogr_feature_uptr& f, mtd_area_map_type* mtd_area_map = null
     return mtd_area_map->at(area_id).area_code_1;
 }
 
+uint get_area_code_l(ogr_feature_uptr& f, mtd_area_map_type* mtd_area_map = nullptr) {
+    area_id_type l_area_id = get_uint_from_feature(f, L_AREA_ID);
+    area_id_type r_area_id = get_uint_from_feature(f, R_AREA_ID);
+    
+    return get_area_code_l(l_area_id, r_area_id, mtd_area_map);
+}
+
 std::vector<std::string> get_hwy_vector(std::map<int, std::vector<std::string>> const HWY_TYPE_MAP, uint area_code_1) {
 	std::vector<std::string> hwy_route_type_vec;
 	if (HWY_TYPE_MAP.find(area_code_1) != HWY_TYPE_MAP.end()) {
-		hwy_route_type_vec = HWY_TYPE_MAP.at(area_code_1);
+            hwy_route_type_vec = HWY_TYPE_MAP.at(area_code_1);
 	} else {
-//		std::cerr << "could not find area_id " << area_code_1 << " use default" << std::endl;
-		hwy_route_type_vec = HWY_TYPE_MAP.at(0);
+            hwy_route_type_vec = HWY_TYPE_MAP.at(0);
 	}
 	return hwy_route_type_vec;
 }
@@ -363,7 +366,8 @@ void add_hazmat_tag(osmium::builder::TagListBuilder* builder, mod_val_type mod_v
  */
 void add_additional_restrictions(osmium::builder::TagListBuilder* builder, link_id_type link_id, area_id_type l_area_id,
         area_id_type r_area_id, cdms_map_type* cdms_map, cnd_mod_map_type* cnd_mod_map,
-        area_id_govt_code_map_type* area_govt_map, cntry_ref_map_type* cntry_map) {
+        area_id_govt_code_map_type* area_govt_map, cntry_ref_map_type* cntry_map,
+        mtd_area_map_type* mtd_area_map = nullptr) {
     if (!cdms_map || !cnd_mod_map) return;
 
     // default is metric units
@@ -374,59 +378,59 @@ void add_additional_restrictions(osmium::builder::TagListBuilder* builder, link_
 
     uint64_t max_height = 0, max_width = 0, max_length = 0, max_weight = 0, max_axleload = 0;
 
-	std::vector<mod_group_type> mod_group_vector;
-	auto range = cdms_map->equal_range(link_id);
-	for (auto it = range.first; it != range.second; ++it) {
-                cond_pair_type cond = it->second;
-                if(cond.second == CT_RESTRICTED_DRIVING_MANOEUVRE
-                        || cond.second == CT_TRANSPORT_RESTRICTED_DRIVING_MANOEUVRE)
-                    continue; //TODO RESTRICTED_DRIVING_MANOEUVRE should apply as conditional turn restriction but not for current link id
-		auto it2 = cnd_mod_map->find(cond.first);
-		if (it2 != cnd_mod_map->end()) {
-                    for (auto mod_group : it2->second) {
-			mod_group_vector.push_back(mod_group);
-                    }
-		}
-	}
+    std::vector<mod_group_type> mod_group_vector;
+    auto range = cdms_map->equal_range(link_id);
+    for (auto it = range.first; it != range.second; ++it) {
+        cond_pair_type cond = it->second;
+        if (cond.second == CT_RESTRICTED_DRIVING_MANOEUVRE
+                || cond.second == CT_TRANSPORT_RESTRICTED_DRIVING_MANOEUVRE)
+            continue; //TODO RESTRICTED_DRIVING_MANOEUVRE should apply as conditional turn restriction but not for current link id
+        auto it2 = cnd_mod_map->find(cond.first);
+        if (it2 != cnd_mod_map->end()) {
+            for (auto mod_group : it2->second) {
+                mod_group_vector.push_back(mod_group);
+            }
+        }
+    }
 
-	for (auto mod_group : mod_group_vector) {
-		auto mod_type = mod_group.mod_type;
-		auto mod_val = mod_group.mod_val;
-		if (mod_type == MT_HEIGHT_RESTRICTION) {
-                    if (!max_height || mod_val < max_height) max_height = mod_val;
-		} else if (mod_type == MT_WIDTH_RESTRICTION) {
-                    if (!max_width || mod_val < max_width) max_width = mod_val;
-		} else if (mod_type == MT_LENGTH_RESTRICTION) {
-                    if (!max_length || mod_val < max_length) max_length = mod_val;
-		} else if (mod_type == MT_WEIGHT_RESTRICTION) {
-                    if (!max_weight || mod_val < max_weight) max_weight = mod_val;
-		} else if (mod_type == MT_WEIGHT_PER_AXLE_RESTRICTION) {
-                    if (!max_axleload || mod_val < max_axleload) max_axleload = mod_val;
-		} else if (mod_type == MT_HAZARDOUS_RESTRICTION) {
-                    add_hazmat_tag(builder, mod_val);
-		}
-	}
-        
-        if (l_area_id == 107 || r_area_id == 107) {
+    for (auto mod_group : mod_group_vector) {
+        auto mod_type = mod_group.mod_type;
+        auto mod_val = mod_group.mod_val;
+        if (mod_type == MT_HEIGHT_RESTRICTION) {
+            if (!max_height || mod_val < max_height) max_height = mod_val;
+        } else if (mod_type == MT_WIDTH_RESTRICTION) {
+            if (!max_width || mod_val < max_width) max_width = mod_val;
+        } else if (mod_type == MT_LENGTH_RESTRICTION) {
+            if (!max_length || mod_val < max_length) max_length = mod_val;
+        } else if (mod_type == MT_WEIGHT_RESTRICTION) {
+            if (!max_weight || mod_val < max_weight) max_weight = mod_val;
+        } else if (mod_type == MT_WEIGHT_PER_AXLE_RESTRICTION) {
+            if (!max_axleload || mod_val < max_axleload) max_axleload = mod_val;
+        } else if (mod_type == MT_HAZARDOUS_RESTRICTION) {
+            add_hazmat_tag(builder, mod_val);
+        }
+    }
+    
+    if (get_area_code_l(l_area_id, r_area_id, mtd_area_map) == 107) {
         /** exceptional handling for Sweden as there are BK Roads
          * 
          * HERE tags these roads with the most conservative values,
          * which would make it unroutable for nearly every truck.
          * Therefore we use the highest value and add a marker for BK2 / BK3 */
-            if (max_weight == 16000 && max_axleload == 10000) {
-                builder->add_tag("maxweight:class", "BK2");
-                max_weight = 51400;
-            } else if (max_weight == 12000 && max_axleload == 8000) {
-                builder->add_tag("maxweight:class", "BK3");
-                max_weight = 37000;
-            }
+        if (max_weight == 16000 && max_axleload == 10000) {
+            builder->add_tag("maxweight:class", "BK2");
+            max_weight = 51400;
+        } else if (max_weight == 12000 && max_axleload == 8000) {
+            builder->add_tag("maxweight:class", "BK3");
+            max_weight = 37000;
         }
+    }
 
-	if (max_height > 0) builder->add_tag("maxheight", imperial_units ? inch_to_feet(max_height) : cm_to_m(max_height));
-	if (max_width > 0)  builder->add_tag("maxwidth", imperial_units ? inch_to_feet(max_width) : cm_to_m(max_width));
-	if (max_length > 0)  builder->add_tag("maxlength", imperial_units ? inch_to_feet(max_length) : cm_to_m(max_length));
-	if (max_weight > 0)  builder->add_tag("maxweight", imperial_units ? lbs_to_metric_ton(max_weight) : kg_to_t(max_weight));
-	if (max_axleload > 0)  builder->add_tag("maxaxleload", imperial_units ? lbs_to_metric_ton(max_axleload) : kg_to_t(max_axleload));
+    if (max_height > 0) builder->add_tag("maxheight", imperial_units ? inch_to_feet(max_height) : cm_to_m(max_height));
+    if (max_width > 0) builder->add_tag("maxwidth", imperial_units ? inch_to_feet(max_width) : cm_to_m(max_width));
+    if (max_length > 0) builder->add_tag("maxlength", imperial_units ? inch_to_feet(max_length) : cm_to_m(max_length));
+    if (max_weight > 0) builder->add_tag("maxweight", imperial_units ? lbs_to_metric_ton(max_weight) : kg_to_t(max_weight));
+    if (max_axleload > 0) builder->add_tag("maxaxleload", imperial_units ? lbs_to_metric_ton(max_axleload) : kg_to_t(max_axleload));
 }
 
 bool is_ferry(const char* value) {
@@ -565,7 +569,7 @@ link_id_type parse_street_tags(osmium::builder::TagListBuilder *builder, ogr_fea
     area_id_type r_area_id = get_uint_from_feature(f, R_AREA_ID);
     // tags which apply to highways and ferry routes
     add_additional_restrictions(builder, link_id, l_area_id, r_area_id, cdms_map, cnd_mod_map, area_govt_map,
-            cntry_map);
+            cntry_map, mtd_area_map);
     add_here_speed_cat_tag(builder, f);
     if (parse_bool(get_field_from_feature(f, TOLLWAY))) builder->add_tag("here:tollway", YES);
     if (parse_bool(get_field_from_feature(f, URBAN))) builder->add_tag("here:urban", YES);
