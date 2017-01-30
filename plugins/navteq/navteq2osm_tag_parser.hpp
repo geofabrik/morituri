@@ -406,6 +406,21 @@ void add_additional_restrictions(osmium::builder::TagListBuilder* builder, link_
                     add_hazmat_tag(builder, mod_val);
 		}
 	}
+        
+        if (l_area_id == 107 || r_area_id == 107) {
+        /** exceptional handling for Sweden as there are BK Roads
+         * 
+         * HERE tags these roads with the most conservative values,
+         * which would make it unroutable for nearly every truck.
+         * Therefore we use the highest value and add a marker for BK2 / BK3 */
+            if (max_weight == 16000 && max_axleload == 10000) {
+                builder->add_tag("maxweight:class", "BK2");
+                max_weight = 51400;
+            } else if (max_weight == 12000 && max_axleload == 8000) {
+                builder->add_tag("maxweight:class", "BK3");
+                max_weight = 37000;
+            }
+        }
 
 	if (max_height > 0) builder->add_tag("maxheight", imperial_units ? inch_to_feet(max_height) : cm_to_m(max_height));
 	if (max_width > 0)  builder->add_tag("maxwidth", imperial_units ? inch_to_feet(max_width) : cm_to_m(max_width));
