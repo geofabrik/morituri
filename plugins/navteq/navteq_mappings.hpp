@@ -19,6 +19,7 @@ static const boost::filesystem::path ADMINBNDY_2_SHP = "Adminbndy2.shp";
 static const boost::filesystem::path ADMINBNDY_3_SHP = "Adminbndy3.shp";
 static const boost::filesystem::path ADMINBNDY_4_SHP = "Adminbndy4.shp";
 static const boost::filesystem::path ADMINBNDY_5_SHP = "Adminbndy5.shp";
+static const boost::filesystem::path ADMINLINE_1_SHP = "AdminLine1.shp";
 static const boost::filesystem::path WATER_SEG_SHP = "WaterSeg.shp";
 static const boost::filesystem::path WATER_POLY_SHP = "WaterPoly.shp";
 static const boost::filesystem::path LAND_USE_A_SHP = "LandUseA.shp";

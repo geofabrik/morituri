@@ -643,15 +643,17 @@ std::string parse_lang_code(std::string lang_code){
     throw std::runtime_error("Language code '" + lang_code + "' not found");
 }
 
+std::string navteq_2_osm_admin_lvl(uint navteq_admin_lvl_int) {
+    if (!is_in_range(navteq_admin_lvl_int, (uint)NAVTEQ_ADMIN_LVL_MIN, (uint)NAVTEQ_ADMIN_LVL_MAX))
+        throw std::runtime_error("invalid admin level. admin level '" + std::to_string(navteq_admin_lvl_int) + "' is out of range.");
+
+    return std::to_string(2 * navteq_admin_lvl_int).c_str();
+}
+
 std::string navteq_2_osm_admin_lvl(std::string navteq_admin_lvl) {
     if (string_is_not_unsigned_integer(navteq_admin_lvl)) throw std::runtime_error("admin level contains invalid character");
 
-    int navteq_admin_lvl_int = stoi(navteq_admin_lvl);
-
-    if (!is_in_range(navteq_admin_lvl_int, NAVTEQ_ADMIN_LVL_MIN, NAVTEQ_ADMIN_LVL_MAX))
-        throw std::runtime_error(
-                "invalid admin level. admin level '" + std::to_string(navteq_admin_lvl_int) + "' is out of range.");
-    return std::to_string(2 * std::stoi(navteq_admin_lvl)).c_str();
+    return navteq_2_osm_admin_lvl( stoi(navteq_admin_lvl) );
 }
 
 const char* parse_house_number_schema(const char* schema){
