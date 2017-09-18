@@ -63,6 +63,7 @@ const char* AR_TAXIS = "AR_TAXIS";
 const char* AR_CARPOOL = "AR_CARPOOL";
 const char* AR_PEDESTRIANS = "AR_PEDEST";
 const char* AR_TRUCKS = "AR_TRUCKS";
+const char* AR_DELIVERY = "AR_DELIV";
 const char* AR_EMERVEH = "AR_EMERVEH";
 const char* AR_MOTORCYCLES = "AR_MOTOR";
 const char* AR_THROUGH_TRAFFIC = "AR_TRAFF";

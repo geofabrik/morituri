@@ -70,6 +70,8 @@ bool is_motorized_allowed(ogr_feature_uptr& f) {
         return true;
     if (parse_bool(get_field_from_feature(f, AR_TRUCKS)))
         return true;
+    if (parse_bool(get_field_from_feature(f, AR_DELIVERY)))
+        return true;
     if (parse_bool(get_field_from_feature(f, AR_EMERVEH)))
         return true;
     if (parse_bool(get_field_from_feature(f, AR_MOTORCYCLES)))
@@ -224,15 +226,29 @@ void add_one_way_tag(osmium::builder::TagListBuilder* builder, const char* value
 }
 
 void add_access_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f) {
-    if (! parse_bool(get_field_from_feature(f, AR_AUTO))) builder->add_tag("motorcar",  NO);
-    if (! parse_bool(get_field_from_feature(f, AR_BUS))) builder->add_tag("bus",  NO);
-    if (! parse_bool(get_field_from_feature(f, AR_TAXIS))) builder->add_tag("taxi",  NO);
+
+    bool automobile_allowed = parse_bool(get_field_from_feature(f, AR_AUTO));
+    if (!automobile_allowed) builder->add_tag("motorcar",  NO);
+
+    if (!parse_bool(get_field_from_feature(f, AR_BUS))) builder->add_tag("bus",  NO);
+    if (!parse_bool(get_field_from_feature(f, AR_TAXIS))) builder->add_tag("taxi",  NO);
 //    if (! parse_bool(get_field_from_feature(f, AR_CARPOOL))) builder->add_tag("hov",  NO);
-    if (! parse_bool(get_field_from_feature(f, AR_PEDESTRIANS))) builder->add_tag("foot",  NO);
-    if (! parse_bool(get_field_from_feature(f, AR_TRUCKS))) builder->add_tag("hgv", NO);
-    if (! parse_bool(get_field_from_feature(f, AR_EMERVEH))) builder->add_tag("emergency",  NO);
-    if (! parse_bool(get_field_from_feature(f, AR_MOTORCYCLES))) builder->add_tag("motorcycle",  NO);
-    if (!parse_bool(get_field_from_feature(f, PUB_ACCESS)) || parse_bool(get_field_from_feature(f, PRIVATE))){
+    if (!parse_bool(get_field_from_feature(f, AR_PEDESTRIANS))) builder->add_tag("foot",  NO);
+
+    if (!parse_bool(get_field_from_feature(f, AR_TRUCKS))) {
+        //truck access handling:
+        if(!parse_bool(get_field_from_feature(f, AR_DELIVERY)))
+            builder->add_tag("hgv", NO); // no truck + no delivery => hgv not allowed at all
+        else if (!automobile_allowed)
+            builder->add_tag("access","delivery"); // no automobile + no truck but delivery => general access is 'delivery'
+        else if (automobile_allowed)
+            builder->add_tag("hgv","delivery"); // automobile generally allowed => only truck is 'delivery'
+    }
+
+    if (!parse_bool(get_field_from_feature(f, AR_EMERVEH))) builder->add_tag("emergency",  NO);
+    if (!parse_bool(get_field_from_feature(f, AR_MOTORCYCLES))) builder->add_tag("motorcycle",  NO);
+
+    if (!parse_bool(get_field_from_feature(f, PUB_ACCESS)) || parse_bool(get_field_from_feature(f, PRIVATE))) {
         builder->add_tag("access", "private");
     } else if (!parse_bool(get_field_from_feature(f, AR_THROUGH_TRAFFIC))){
         builder->add_tag("access", "destination");
