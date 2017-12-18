@@ -175,3 +175,10 @@ TEST_CASE("ogr2wkb", "[ogr2wkb]"){
     CHECK(wkb_test == wkb_reference);
 }
 
+TEST_CASE("to_camel_case_with_spaces", "[to_camel_case_with_spaces]"){
+    CHECK(to_camel_case_with_spaces("SIBIRIEN") == std::string("Sibirien"));
+    CHECK(to_camel_case_with_spaces("FUCHSBERGER DAMM") == std::string("Fuchsberger Damm"));
+    CHECK(to_camel_case_with_spaces("KÖNIGSBERGER STRASSE") == std::string("Königsberger Strasse"));
+    CHECK(to_camel_case_with_spaces("KØBENHAVN") == std::string("København"));
+    CHECK(to_camel_case_with_spaces("") == std::string(""));
+}
