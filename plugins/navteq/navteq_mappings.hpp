@@ -196,10 +196,9 @@ std::map<int, std::vector<std::string>> const HWY_ROUTE_TYPE_MAP = {
 	{   0 /*"DEFAULT"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
 	{   1 /*"ITA"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, "", "" } },
         {   2 /*"FRA"*/, { "", TRUNK, TRUNK, TRUNK, SECONDARY, TERTIARY, UNCLASSIFIED } },      //exceptional handling for type 4
-	{   3 /*"GER"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },// tested
+	{   3 /*"GER"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
 	{   5 /*"BEL"*/, { "", TRUNK, TRUNK, PRIMARY, "", "", PRIMARY } },                      //exceptional handling for type 3
         {   6 /*"NLD"*/, { "", TRUNK, TRUNK, PRIMARY, "", "", SECONDARY } },
-      //{   6 /*"???"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, TERTIARY, UNCLASSIFIED } },
 	{   7 /*"LUX"*/, { "", TRUNK, TRUNK, PRIMARY, SECONDARY, "", "" } },
         {   8 /*"CHE"*/, { "", TRUNK, TRUNK, PRIMARY, "", "", "" } },
         {   9 /*"AUT"*/, { "", TRUNK, TRUNK, TRUNK, PRIMARY, TERTIARY, "" } },                  //exceptional handling for type 4 and 5 
