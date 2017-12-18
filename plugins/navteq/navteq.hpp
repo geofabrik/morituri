@@ -49,23 +49,17 @@ osmium::unsigned_object_id_type g_osm_id = 1;
 // g_link_id_map maps navteq link_ids to a vector of osm_ids (it will mostly map to a single osm_id)
 link_id_map_type g_link_id_map;
 
+// g_route_type_map maps navteq link_ids to the lowest occurring route_type value
+link_id_route_type_map g_route_type_map;
+
+// g_hwys_ref_map maps navteq link_ids to a vector of highway names
+link_id_to_names_map g_hwys_ref_map;
+
 // Provides access to elements in g_way_buffer through offsets
 osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, size_t> g_way_offset_map;
 
-// data structure to store admin boundary tags
-struct mtd_area_dataset {
-    osmium::unsigned_object_id_type area_id;
-    std::string admin_lvl;
-    std::vector<std::pair<std::string, std::string>> lang_code_2_area_name;
-
-    void print() {
-        std::cout << "area_id=" << area_id;
-        std::cout << ", admin_lvl=" << admin_lvl;
-        std::cout << std::endl;
-    }
-};
 // auxiliary map which maps datasets with tags for administrative boundaries
-std::map<osmium::unsigned_object_id_type, mtd_area_dataset> g_mtd_area_map;
+mtd_area_map_type g_mtd_area_map;
 
 // map for conditional modifications
 cnd_mod_map_type g_cnd_mod_map;
@@ -178,8 +172,8 @@ link_id_type build_tag_list(ogr_feature_uptr& feat, osmium::builder::Builder* bu
         short z_level = -5) {
     osmium::builder::TagListBuilder tl_builder(buf, builder);
 
-    link_id_type link_id = parse_street_tags(&tl_builder, feat, &g_cdms_map, &g_cnd_mod_map, &g_area_to_govt_code_map,
-            &g_cntry_ref_map);
+    link_id_type link_id = parse_street_tags(&tl_builder, feat, &g_cdms_map, &g_cnd_mod_map, 
+            &g_area_to_govt_code_map, &g_cntry_ref_map, &g_mtd_area_map, &g_route_type_map, &g_hwys_ref_map);
 
     if (z_level != -5 && z_level != 0) tl_builder.add_tag("layer", std::to_string(z_level).c_str());
     if (link_id == 0) throw(format_error("layers column field '" + std::string(LINK_ID) + "' is missing"));
@@ -191,7 +185,7 @@ link_id_type build_tag_list(ogr_feature_uptr& feat, osmium::builder::Builder* bu
  * \param location Location of Node being created.
  * \param builder NodeBuilder to create Node.
  * \return id of created Node.
- * */
+ */
 osmium::unsigned_object_id_type build_node(osmium::Location location, osmium::builder::NodeBuilder* builder) {
     assert(builder != nullptr);
     STATIC_NODE(builder->object()).set_id(g_osm_id++);
@@ -205,19 +199,29 @@ osmium::unsigned_object_id_type build_node(osmium::Location location, osmium::bu
  * \brief creates Node and writes it to m_buffer.
  * \param location Location of Node being created.
  * \return id of created Node.
- * */
+ */
 osmium::unsigned_object_id_type build_node(osmium::Location location) {
     osmium::builder::NodeBuilder builder(g_node_buffer);
     return build_node(location, &builder);
 }
 
-osmium::unsigned_object_id_type build_node_with_tag(osmium::Location location, const char* tag_key,
-        const char* tag_val) {
+/**
+ * \brief creates Node with tags and writes it to m_buffer.
+ * \param location Location of Node being created.
+ * \param kv_vector holds tags as key value pairs
+ * \return id of created Node.
+ */
+osmium::unsigned_object_id_type build_node_with_tags(osmium::Location location, const std::vector<key_val_pair_type>& kv_vector) {
     osmium::builder::NodeBuilder node_builder(g_node_buffer);
     auto node_id = build_node(location, &node_builder);
-    if (tag_key) {
-        osmium::builder::TagListBuilder tl_builder(g_node_buffer, &node_builder);
-        tl_builder.add_tag(tag_key, tag_val);
+
+    osmium::builder::TagListBuilder tl_builder(g_node_buffer, &node_builder);
+    for (auto kv_pair : kv_vector){
+		auto tag_key = kv_pair.first;
+		auto tag_val = kv_pair.second;
+		if (tag_key) {
+			tl_builder.add_tag(tag_key, tag_val);
+		}
     }
     return node_id;
 }
@@ -533,6 +537,12 @@ void set_ferry_z_lvls_to_zero(ogr_feature_uptr& feat, index_z_lvl_vector_type& z
         z_lvl_vec.erase(z_lvl_vec.end());
 }
 
+/**
+ * \brief creates interpolated house numbers alongside of a given linestring if feature holds suitable tags
+ * \param feat feature which holds the tags
+ * \param ogr_ls linestring which receives the interpolated house numbers
+ * \param left specifies on which side of the linestring the house numbers will be applied
+ */
 void create_house_numbers(ogr_feature_uptr& feat, ogr_line_string_uptr& ogr_ls, bool left) {
     const char* ref_addr = left ? L_REFADDR : R_REFADDR;
     const char* nref_addr = left ? L_NREFADDR : R_NREFADDR;
@@ -543,7 +553,7 @@ void create_house_numbers(ogr_feature_uptr& feat, ogr_line_string_uptr& ogr_ls, 
     if (!strcmp(get_field_from_feature(feat, addr_schema), "")) return;
     if (!strcmp(get_field_from_feature(feat, addr_schema), "M")) return;
 
-    ogr_line_string_uptr offset_ogr_ls(create_offset_curve(ogr_ls.get(), 0.00005, left));
+	ogr_line_string_uptr offset_ogr_ls(create_offset_curve(ogr_ls.get(), HOUSENUMBER_CURVE_OFFSET, left));
     assert(ogr_ls);
     osmium::builder::WayBuilder way_builder(g_way_buffer);
     STATIC_WAY(way_builder.object()).set_id(g_osm_id++);
@@ -553,15 +563,17 @@ void create_house_numbers(ogr_feature_uptr& feat, ogr_line_string_uptr& ogr_ls, 
     for (int i = 0; i < offset_ogr_ls->getNumPoints(); i++) {
         osmium::Location location(offset_ogr_ls->getX(i), offset_ogr_ls->getY(i));
         assert(location.valid());
-        osmium::unsigned_object_id_type node_id;
-        if (i == 0) {
-            node_id = build_node_with_tag(location, "addr:housenumber", get_field_from_feature(feat, ref_addr));
-        } else if (i == offset_ogr_ls->getNumPoints() - 1) {
-            node_id = build_node_with_tag(location, "addr:housenumber", get_field_from_feature(feat, nref_addr));
-        } else {
-            node_id = build_node(location);
-        }
 
+        std::vector<key_val_pair_type> tags;
+        if (i == 0 || i == offset_ogr_ls->getNumPoints() - 1) {
+            if (i == 0) {
+                tags.push_back(key_val_pair_type("addr:housenumber", get_field_from_feature(feat, left ? ref_addr : nref_addr)));
+            } else if (i == offset_ogr_ls->getNumPoints() - 1) {
+                tags.push_back(key_val_pair_type("addr:housenumber", get_field_from_feature(feat, left ? nref_addr : ref_addr)));
+            }
+            tags.push_back(key_val_pair_type("addr:street", strdup(to_camel_case_with_spaces(get_field_from_feature(feat, ST_NAME)).c_str())));
+        }
+        osmium::unsigned_object_id_type node_id = build_node_with_tags(location, tags);
         wnl_builder.add_node_ref(osmium::NodeRef(node_id, location));
     }
     {
@@ -648,10 +660,10 @@ void process_way_end_nodes(OGRLineString *ogr_ls) {
 }
 
 /**
- * \brief creates nodes for administrative boundary
+ * \brief creates nodes for closed ways (i.e. for administrative boundary)
  * \return osm_ids of created nodes
  */
-node_vector_type create_admin_boundary_way_nodes(OGRLinearRing* ring) {
+node_vector_type create_closed_way_nodes(OGRLinearRing* ring) {
     node_vector_type osm_way_node_ids;
     loc_osmid_pair_type first_node;
     for (int i = 0; i < ring->getNumPoints() - 1; i++) {
@@ -669,11 +681,25 @@ node_vector_type create_admin_boundary_way_nodes(OGRLinearRing* ring) {
 }
 
 /**
- * \brief creates ways for administrative boundary
+ * \brief creates nodes for open ways
+ * \return osm_ids of created nodes
+ */
+node_vector_type create_open_way_nodes(OGRLineString* line) {
+    node_vector_type osm_way_node_ids;
+    for (int i = 0; i < line->getNumPoints(); i++) {
+        osmium::Location location(line->getX(i), line->getY(i));
+        auto osm_id = build_node(location);
+        osm_way_node_ids.push_back(loc_osmid_pair_type(location, osm_id));
+    }
+    return osm_way_node_ids;
+}
+
+/**
+ * \brief creates closed ways (i.e. for administrative boundary)
  * \return osm_ids of created ways
  */
-osm_id_vector_type build_admin_boundary_ways(OGRLinearRing* ring) {
-    node_vector_type osm_way_node_ids = create_admin_boundary_way_nodes(ring);
+osm_id_vector_type build_closed_ways(OGRLinearRing* ring) {
+    node_vector_type osm_way_node_ids = create_closed_way_nodes(ring);
 
     osm_id_vector_type osm_way_ids;
     int i = 0;
@@ -692,20 +718,19 @@ osm_id_vector_type build_admin_boundary_ways(OGRLinearRing* ring) {
 }
 
 /**
- * \brief adds navteq administrative boundary tags to Relation
+ * \brief adds navteq administrative boundary or admin lines tags
  */
-void build_admin_boundary_taglist(osmium::builder::RelationBuilder& builder, ogr_layer_uptr& layer,
+void build_admin_boundary_taglist(osmium::builder::TagListBuilder& tl_builder, ogr_layer_uptr& layer,
         ogr_feature_uptr& feat) {
-    // Mind tl_builder scope!
-    osmium::builder::TagListBuilder tl_builder(g_rel_buffer, &builder);
-    tl_builder.add_tag("type", "multipolygon");
+    // Mind tl_builder scope in calling method!
+    tl_builder.add_tag("type", "boundary");
     tl_builder.add_tag("boundary", "administrative");
     for (int i = 0; i < layer->GetLayerDefn()->GetFieldCount(); i++) {
         OGRFieldDefn* po_field_defn = layer->GetLayerDefn()->GetFieldDefn(i);
         const char* field_name = po_field_defn->GetNameRef();
         const char* field_value = feat->GetFieldAsString(i);
         // admin boundary mapping: see NAVSTREETS Street Data Reference Manual: p.947)
-        if (!strcmp(field_name, "AREA_ID")) {
+        if (!strcmp(field_name, AREA_ID)) {
             osmium::unsigned_object_id_type area_id = std::stoi(field_value);
             if (g_mtd_area_map.find(area_id) != g_mtd_area_map.end()) {
                 auto d = g_mtd_area_map.at(area_id);
@@ -716,12 +741,299 @@ void build_admin_boundary_taglist(osmium::builder::RelationBuilder& builder, ogr
 
                 for (auto it : d.lang_code_2_area_name)
                     tl_builder.add_tag(std::string("name:" + parse_lang_code(it.first)), it.second);
-                //                    if (!d.area_name_tr.empty()) tl_builder.add_tag("int_name", d.area_name_tr);
+            } else if (area_id != 0) {
+                //only log areas which are specified
+                std::cerr << "Skipping unknown navteq_admin_level of area " << area_id << std::endl;
+            }
+        } else if (!strcmp(field_name, FEAT_COD)) {
+            osmium::unsigned_object_id_type feat_code = std::stoi(field_value);
+            // FEAT_TYPE 'SETTLEMENT'
+            if (feat_code == 900156)
+                tl_builder.add_tag("landuse", "residential");
+        }
+    }
+}
+
+/**
+ * \brief adds navteq water tags to Relation
+ */
+void build_water_poly_taglist(osmium::builder::RelationBuilder& builder, ogr_layer_uptr& layer,
+        ogr_feature_uptr& feat) {
+    // Mind tl_builder scope!
+    osmium::builder::TagListBuilder tl_builder(g_rel_buffer, &builder);
+    tl_builder.add_tag("type", "multipolygon");
+    tl_builder.add_tag("natural", "water");
+
+    for (int i = 0; i < layer->GetLayerDefn()->GetFieldCount(); i++) {
+        OGRFieldDefn* po_field_defn = layer->GetLayerDefn()->GetFieldDefn(i);
+        const char* field_name = po_field_defn->GetNameRef();
+        const char* field_value = feat->GetFieldAsString(i);
+        
+        if (!strcmp(field_name, POLYGON_NM)) {
+            if(field_value && field_value[0]) {
+                std::string waters_name = to_camel_case_with_spaces(field_value);
+                if (!waters_name.empty()) tl_builder.add_tag("name", waters_name);
+            }
+        }
+        
+        if (!strcmp(field_name, FEAT_COD)) {
+            if (!strcmp(field_value, "500412")) {
+                // FEAT_TYPE 'RIVER'
+                tl_builder.add_tag("water", "river");
+            } else if (!strcmp(field_value, "500414")) {
+                // FEAT_TYPE 'CANAL/WATER CHANNEL'
+                tl_builder.add_tag("water", "canal");
+            } else if (!strcmp(field_value, "500421")) {
+                // FEAT_TYPE 'LAKE'
+                tl_builder.add_tag("water", "lake");
+            } else if (!strcmp(field_value, "507116")) {
+                // Type 'BAY/HARBOUR' just gets the 'natural=water' tag
             } else {
-                std::cerr << "skipping unknown navteq_admin_level" << std::endl;
+                std::cerr << "Skipping unknown water poly type " << field_value << std::endl;
             }
         }
     }
+}
+
+/**
+ * \brief adds navteq water tags to way
+ */
+void build_water_way_taglist(osmium::builder::WayBuilder& builder, ogr_layer_uptr& layer,
+        ogr_feature_uptr& feat) {
+    // Mind tl_builder scope!
+    osmium::builder::TagListBuilder tl_builder(g_way_buffer, &builder);
+//    tl_builder.add_tag("natural", "water");
+    for (int i = 0; i < layer->GetLayerDefn()->GetFieldCount(); i++) {
+        OGRFieldDefn* po_field_defn = layer->GetLayerDefn()->GetFieldDefn(i);
+        const char* field_name = po_field_defn->GetNameRef();
+        const char* field_value = feat->GetFieldAsString(i);
+        
+        if (!strcmp(field_name, POLYGON_NM)) {
+            if(field_value && field_value[0]) {
+                std::string waters_name = to_camel_case_with_spaces(field_value);
+                if (!waters_name.empty()) tl_builder.add_tag("name", waters_name);
+            }
+        }
+        
+        if (!strcmp(field_name, FEAT_COD)) {
+            if (!strcmp(field_value, "500412")) {
+                // FEAT_TYPE 'RIVER'
+                tl_builder.add_tag("waterway", "river");
+            } else if (!strcmp(field_value, "500414")) {
+                // FEAT_TYPE 'CANAL/WATER CHANNEL'
+                tl_builder.add_tag("waterway", "canal");
+            } else if (!strcmp(field_value, "500421")) {
+                // FEAT_TYPE 'LAKE'
+                std::cerr << "Skipping water way as type LAKE should only exist as polygon" << std::endl;
+            } else if (!strcmp(field_value, "507116")) {
+                // FEAT_TYPE 'BAY/HARBOUR'
+                std::cerr << "Skipping water way as type BAY/HARBOUR should only exist as polygon" << std::endl;
+            } else {
+                std::cerr << "Skipping unknown water way type " << field_value << std::endl;
+            }
+        }
+    }
+}
+
+/**
+ * \brief adds navteq rail road tags to way
+ */
+void build_rail_road_taglist(osmium::builder::WayBuilder& builder, ogr_layer_uptr& layer,
+        ogr_feature_uptr& feat) {
+    // Mind tl_builder scope!
+    osmium::builder::TagListBuilder tl_builder(g_way_buffer, &builder);
+    tl_builder.add_tag("railway", "rail");
+    tl_builder.add_tag("usage", "main"); //TODO check if HERE-Data contains less important rail ways without 'usage=main'
+    for (int i = 0; i < layer->GetLayerDefn()->GetFieldCount(); i++) {
+        OGRFieldDefn* po_field_defn = layer->GetLayerDefn()->GetFieldDefn(i);
+        const char* field_name = po_field_defn->GetNameRef();
+        const char* field_value = feat->GetFieldAsString(i);
+
+        if (!strcmp(field_name, BRIDGE)) {
+            if (parse_bool(field_value))
+                tl_builder.add_tag("bridge", YES);
+        } else if (!strcmp(field_name, TUNNEL)) {
+            if (parse_bool(field_value))
+                tl_builder.add_tag("tunnel", YES);
+        }
+    }
+}
+
+/**
+ * \brief adds navteq landuse tags to Relation
+ */
+void build_landuse_taglist(osmium::builder::RelationBuilder& builder, ogr_layer_uptr& layer,
+        ogr_feature_uptr& feat) {
+    // Mind tl_builder scope!
+    osmium::builder::TagListBuilder tl_builder(g_rel_buffer, &builder);
+    tl_builder.add_tag("type", "multipolygon");
+    
+    for (int i = 0; i < layer->GetLayerDefn()->GetFieldCount(); i++) {
+        OGRFieldDefn* po_field_defn = layer->GetLayerDefn()->GetFieldDefn(i);
+        const char* field_name = po_field_defn->GetNameRef();
+        const char* field_value = feat->GetFieldAsString(i);
+        
+        if (!strcmp(field_name, POLYGON_NM)) {
+            if(field_value && field_value[0]) {
+                std::string poly_name = to_camel_case_with_spaces(field_value);
+                if (!poly_name.empty()) tl_builder.add_tag("name", poly_name);
+            }
+        }
+        
+        if (!strcmp(field_name, FEAT_COD)) {
+            
+            // Land Use A types
+            if (!strcmp(field_value, "509998")) {
+                // FEAT_TYPE 'BEACH'
+                tl_builder.add_tag("natural", "beach");
+            } else if (!strcmp(field_value, "900103")) {
+                // FEAT_TYPE 'PARK/MONUMENT (NATIONAL)'
+                tl_builder.add_tag("boundary", "national_park");
+            } else if (!strcmp(field_value, "900130")) {
+                // FEAT_TYPE 'PARK (STATE)'
+                // In many cases this is meant to be a national park or
+                // protected area but this is not guaranteed
+                tl_builder.add_tag("leisure", "park");
+            } else if (!strcmp(field_value, "900140")) {
+                // FEAT_TYPE 'PARK IN WATER'
+                tl_builder.add_tag("boundary", "national_park");
+            } else if (!strcmp(field_value, "900150")) {
+                // FEAT_TYPE 'PARK (CITY/COUNTY)'
+                tl_builder.add_tag("leisure", "park");
+            } else if (!strcmp(field_value, "900159")) {
+                // FEAT_TYPE 'UNDEFINED TRAFFIC AREA'
+                // Possible handling: area=yes, highway=pedestrian
+            } else if (!strcmp(field_value, "900202")) {
+                // FEAT_TYPE 'WOODLAND'
+                tl_builder.add_tag("landuse", "forest");
+            } else if (!strcmp(field_value, "1700215")) {
+                // FEAT_TYPE 'PARKING LOT'
+                tl_builder.add_tag("amenity", "parking");
+            } else if (!strcmp(field_value, "1900403")) {
+                // FEAT_TYPE 'AIRPORT'
+                tl_builder.add_tag("aeroway", "aerodrome");
+            } else if (!strcmp(field_value, "2000124")) {
+                // FEAT_TYPE 'SHOPPING CENTRE'
+                tl_builder.add_tag("shop", "mall");
+                tl_builder.add_tag("building", "retail");
+            } else if (!strcmp(field_value, "2000200")) {
+                // FEAT_TYPE 'INDUSTRIAL COMPLEX'
+                // Could also be landuse=commercial
+                tl_builder.add_tag("landuse", "industrial");
+            } else if (!strcmp(field_value, "2000403")) {
+                // FEAT_TYPE 'UNIVERSITY/COLLEGE'
+                tl_builder.add_tag("amenity", "university");
+            } else if (!strcmp(field_value, "2000408")) {
+                // FEAT_TYPE 'HOSPITAL'
+                tl_builder.add_tag("amenity", "hospital");
+            } else if (!strcmp(field_value, "2000420")) {
+                // FEAT_TYPE 'CEMETERY'
+                tl_builder.add_tag("landuse", "cemetery");
+            } else if (!strcmp(field_value, "2000457")) {
+                // FEAT_TYPE 'SPORTS COMPLEX'
+                tl_builder.add_tag("leisure", "stadium");
+                //tl_builder.add_tag("building", "yes");
+            } else if (!strcmp(field_value, "2000460")) {
+                // FEAT_TYPE 'AMUSEMENT PARK'
+                tl_builder.add_tag("leisure", "park");
+                tl_builder.add_tag("tourism", "theme_park");
+            } else if (!strcmp(field_value, "908002")) {
+                // FEAT TYPE 'NEIGHBOURHOOD BOUNDARY'
+                tl_builder.add_tag("place", "neighbourhood");
+            }// Not implemented so far due to missing sample in data: 
+              // "ANIMAL PARK" (2000461), MILITARY BASE (900108), NATIVE AMERICAN RESERVATION (900107), RAILYARD (9997007)
+            // Land Use B types
+            else if (!strcmp(field_value, "900158")) {
+                // FEAT_TYPE 'PEDESTRIAN ZONE'
+                tl_builder.add_tag("highway", "pedestrian");
+            } else if (!strcmp(field_value, "1907403")) {
+                // FEAT_TYPE 'AIRCRAFT ROADS'
+                tl_builder.add_tag("aeroway", "runway");
+            } else if (!strcmp(field_value, "2000123")) {
+                // FEAT_TYPE 'GOLF COURSE'
+                tl_builder.add_tag("leisure", "golf_course");
+                tl_builder.add_tag("sport", "golf");
+            } else if (!strcmp(field_value, "9997004")) {
+                // FEAT_TYPE 'CONGESTION ZONE'
+                // skipping due to no osm equivalent
+            } else if (!strcmp(field_value, "9997010")) {
+                // FEAT_TYPE 'ENVIRONMENTAL ZONE'
+                tl_builder.add_tag("boundary", "low_emission_zone");
+                tl_builder.add_tag("type", "boundary");
+            } 
+            // Unknown if Land Use A or B types, but seems to appear somewhere
+            else if (!strcmp(field_value, "509997")) {
+                // FEAT_TYPE 'GLACIER'
+                tl_builder.add_tag("natural", "glacier");
+            } else {
+                std::cerr << "Skipping unknown landuse type " << field_value << " " << std::endl;
+            }
+        }
+    }
+}
+
+osm_id_vector_type build_water_ways_with_tagList(ogr_layer_uptr& layer, ogr_feature_uptr& feat,
+        OGRLineString* line) {
+    node_vector_type osm_way_node_ids = create_open_way_nodes(line);
+
+    osm_id_vector_type osm_way_ids;
+    int i = 0;
+    do {
+        osmium::builder::WayBuilder builder(g_way_buffer);
+        STATIC_WAY(builder.object()).set_id(g_osm_id++);
+        set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
+        builder.add_user(USER);
+        build_water_way_taglist(builder, layer, feat);
+        osmium::builder::WayNodeListBuilder wnl_builder(g_way_buffer, &builder);
+        for (int j = i; j < std::min(i + OSM_MAX_WAY_NODES, (int) osm_way_node_ids.size()); j++)
+            wnl_builder.add_node_ref(osm_way_node_ids.at(j).second, osm_way_node_ids.at(j).first);
+        osm_way_ids.push_back(STATIC_WAY(builder.object()).id());
+        i += OSM_MAX_WAY_NODES - 1;
+    } while (i < osm_way_node_ids.size());
+    return osm_way_ids;
+}
+
+osm_id_vector_type build_rail_road(ogr_layer_uptr& layer, ogr_feature_uptr& feat, OGRLineString* line) {
+    node_vector_type osm_way_node_ids = create_open_way_nodes(line);
+
+    osm_id_vector_type osm_way_ids;
+    int i = 0;
+    do {
+        osmium::builder::WayBuilder builder(g_way_buffer);
+        STATIC_WAY(builder.object()).set_id(g_osm_id++);
+        set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
+        builder.add_user(USER);
+        build_rail_road_taglist(builder, layer, feat);
+        osmium::builder::WayNodeListBuilder wnl_builder(g_way_buffer, &builder);
+        for (int j = i; j < std::min(i + OSM_MAX_WAY_NODES, (int) osm_way_node_ids.size()); j++)
+            wnl_builder.add_node_ref(osm_way_node_ids.at(j).second, osm_way_node_ids.at(j).first);
+        osm_way_ids.push_back(STATIC_WAY(builder.object()).id());
+        i += OSM_MAX_WAY_NODES - 1;
+    } while (i < osm_way_node_ids.size());
+    return osm_way_ids;
+}
+
+osm_id_vector_type build_admin_line(ogr_layer_uptr& layer, ogr_feature_uptr& feat, OGRLineString* line) {
+    node_vector_type osm_way_node_ids = create_open_way_nodes(line);
+
+    osm_id_vector_type osm_way_ids;
+    int i = 0;
+    do {
+        osmium::builder::WayBuilder builder(g_way_buffer);
+        STATIC_WAY(builder.object()).set_id(g_osm_id++);
+        set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
+        builder.add_user(USER);
+        { //limit tl_builder scope!
+            osmium::builder::TagListBuilder tl_builder(g_way_buffer, &builder);
+            build_admin_boundary_taglist(tl_builder, layer, feat);
+        }
+        osmium::builder::WayNodeListBuilder wnl_builder(g_way_buffer, &builder);
+        for (int j = i; j < std::min(i + OSM_MAX_WAY_NODES, (int) osm_way_node_ids.size()); j++)
+            wnl_builder.add_node_ref(osm_way_node_ids.at(j).second, osm_way_node_ids.at(j).first);
+        osm_way_ids.push_back(STATIC_WAY(builder.object()).id());
+        i += OSM_MAX_WAY_NODES - 1;
+    } while (i < osm_way_node_ids.size());
+    return osm_way_ids;
 }
 
 void build_relation_members(osmium::builder::RelationBuilder& builder, const osm_id_vector_type& ext_osm_way_ids,
@@ -741,7 +1053,32 @@ osmium::unsigned_object_id_type build_admin_boundary_relation_with_tags(ogr_laye
     STATIC_RELATION(builder.object()).set_id(g_osm_id++);
     set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
     builder.add_user(USER);
-    build_admin_boundary_taglist(builder, layer, feat);
+    { //limit tl_builder scope!
+        osmium::builder::TagListBuilder tl_builder(g_rel_buffer, &builder);
+        build_admin_boundary_taglist(tl_builder, layer, feat);
+    }
+    build_relation_members(builder, ext_osm_way_ids, int_osm_way_ids);
+    return STATIC_RELATION(builder.object()).id();
+}
+
+osmium::unsigned_object_id_type build_water_relation_with_tags(ogr_layer_uptr& layer, ogr_feature_uptr& feat,
+        osm_id_vector_type ext_osm_way_ids, osm_id_vector_type int_osm_way_ids) {
+    osmium::builder::RelationBuilder builder(g_rel_buffer);
+    STATIC_RELATION(builder.object()).set_id(g_osm_id++);
+    set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
+    builder.add_user(USER);
+    build_water_poly_taglist(builder, layer, feat);
+    build_relation_members(builder, ext_osm_way_ids, int_osm_way_ids);
+    return STATIC_RELATION(builder.object()).id();
+}
+
+osmium::unsigned_object_id_type build_landuse_relation_with_tags(ogr_layer_uptr& layer, ogr_feature_uptr& feat,
+        osm_id_vector_type ext_osm_way_ids, osm_id_vector_type int_osm_way_ids) {
+    osmium::builder::RelationBuilder builder(g_rel_buffer);
+    STATIC_RELATION(builder.object()).set_id(g_osm_id++);
+    set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
+    builder.add_user(USER);
+    build_landuse_taglist(builder, layer, feat);
     build_relation_members(builder, ext_osm_way_ids, int_osm_way_ids);
     return STATIC_RELATION(builder.object()).id();
 }
@@ -749,29 +1086,29 @@ osmium::unsigned_object_id_type build_admin_boundary_relation_with_tags(ogr_laye
 /**
  * \brief handles administrative boundary multipolygons
  */
-void create_admin_boundary_member(ogr_multi_polygon_uptr&& mp, osm_id_vector_type& mp_ext_ring_osm_ids,
+void create_multi_polygon(ogr_multi_polygon_uptr&& mp, osm_id_vector_type& mp_ext_ring_osm_ids,
         osm_id_vector_type& mp_int_ring_osm_ids) {
 
     for (int i = 0; i < mp->getNumGeometries(); i++) {
         OGRPolygon* poly = static_cast<OGRPolygon*>(mp->getGeometryRef(i));
 
-        osm_id_vector_type exterior_way_ids = build_admin_boundary_ways(poly->getExteriorRing());
+        osm_id_vector_type exterior_way_ids = build_closed_ways(poly->getExteriorRing());
         // append osm_way_ids to relation_member_ids
         std::move(exterior_way_ids.begin(), exterior_way_ids.end(), std::back_inserter(mp_ext_ring_osm_ids));
 
         for (int i = 0; i < poly->getNumInteriorRings(); i++) {
-            auto interior_way_ids = build_admin_boundary_ways(poly->getInteriorRing(i));
+            auto interior_way_ids = build_closed_ways(poly->getInteriorRing(i));
             std::move(interior_way_ids.begin(), interior_way_ids.end(), std::back_inserter(mp_int_ring_osm_ids));
         }
     }
 }
 
-void create_admin_boundary_member(ogr_polygon_uptr&& poly, osm_id_vector_type& exterior_way_ids,
+void create_polygon(ogr_polygon_uptr&& poly, osm_id_vector_type& exterior_way_ids,
         osm_id_vector_type& interior_way_ids) {
-    exterior_way_ids = build_admin_boundary_ways(poly->getExteriorRing());
+    exterior_way_ids = build_closed_ways(poly->getExteriorRing());
 
     for (int i = 0; i < poly->getNumInteriorRings(); i++) {
-        auto tmp = build_admin_boundary_ways(poly->getInteriorRing(i));
+        auto tmp = build_closed_ways(poly->getInteriorRing(i));
         std::move(tmp.begin(), tmp.end(), std::back_inserter(interior_way_ids));
     }
 }
@@ -785,11 +1122,11 @@ void process_admin_boundary(ogr_layer_uptr& layer, ogr_feature_uptr& feat) {
 
     osm_id_vector_type exterior_way_ids, interior_way_ids;
     if (geom_type == wkbMultiPolygon) {
-        create_admin_boundary_member(ogr_multi_polygon_uptr(static_cast<OGRMultiPolygon*>(geom.release())),
+        create_multi_polygon(ogr_multi_polygon_uptr(static_cast<OGRMultiPolygon*>(geom.release())),
                 exterior_way_ids, interior_way_ids);
 
     } else if (geom_type == wkbPolygon) {
-        create_admin_boundary_member(ogr_polygon_uptr(static_cast<OGRPolygon*>(geom.release())), exterior_way_ids,
+        create_polygon(ogr_polygon_uptr(static_cast<OGRPolygon*>(geom.release())), exterior_way_ids,
                 interior_way_ids);
     } else {
         throw(std::runtime_error(
@@ -804,14 +1141,102 @@ void process_admin_boundary(ogr_layer_uptr& layer, ogr_feature_uptr& feat) {
 }
 
 /**
+ * \brief adds administrative lines as Ways to m_buffer
+ */
+void process_admin_line(ogr_layer_uptr& layer, ogr_feature_uptr& feat) {
+    ogr_geometry_uptr geom(feat->GetGeometryRef());
+    assert(geom->getGeometryType() == wkbLineString);
+
+    OGRLineString* line = static_cast<OGRLineString*> (geom.release());
+    build_admin_line(layer, feat, line);
+    
+    g_node_buffer.commit();
+    g_way_buffer.commit();
+    geom.release();
+}
+
+/**
+ * \brief adds water polygons as Relations to m_buffer
+ */
+void process_water(ogr_layer_uptr& layer, ogr_feature_uptr& feat) {
+    ogr_geometry_uptr geom(feat->GetGeometryRef());
+    auto geom_type = geom->getGeometryType();
+
+    if (geom_type == wkbLineString) {
+        OGRLineString* line = static_cast<OGRLineString*> (geom.release());
+        build_water_ways_with_tagList(layer, feat, line);
+    } else {
+        osm_id_vector_type exterior_way_ids, interior_way_ids;
+        if (geom_type == wkbMultiPolygon) {
+            create_multi_polygon(ogr_multi_polygon_uptr(static_cast<OGRMultiPolygon*> (geom.release())),
+                    exterior_way_ids, interior_way_ids);
+        } else if (geom_type == wkbPolygon) {
+            create_polygon(ogr_polygon_uptr(static_cast<OGRPolygon*> (geom.release())),
+                    exterior_way_ids, interior_way_ids);
+        } else {
+            throw (std::runtime_error(
+                    "Water item with geometry=" + std::string(geom->getGeometryName()) + " is not yet supported."));
+        }
+        build_water_relation_with_tags(layer, feat, exterior_way_ids, interior_way_ids);
+    }
+   
+    g_node_buffer.commit();
+    g_way_buffer.commit();
+    g_rel_buffer.commit();
+    geom.release();
+}
+
+/**
+ * \brief adds rail road ways to m_buffer
+ */
+void process_rail_road(ogr_layer_uptr& layer, ogr_feature_uptr& feat) {
+    ogr_geometry_uptr geom(feat->GetGeometryRef());
+    assert(geom->getGeometryType() == wkbLineString);
+
+    OGRLineString* line = static_cast<OGRLineString*> (geom.release());
+    build_rail_road(layer, feat, line);
+    
+    g_node_buffer.commit();
+    g_way_buffer.commit();
+    geom.release();
+}
+
+/**
+ * \brief adds landuse polygons as Relations to m_buffer
+ */
+void process_landuse(ogr_layer_uptr& layer, ogr_feature_uptr& feat) {
+    ogr_geometry_uptr geom(feat->GetGeometryRef());
+    auto geom_type = geom->getGeometryType();
+    
+    osm_id_vector_type exterior_way_ids, interior_way_ids;
+    if (geom_type == wkbMultiPolygon) {
+        create_multi_polygon(ogr_multi_polygon_uptr(static_cast<OGRMultiPolygon*> (geom.release())),
+                exterior_way_ids, interior_way_ids);
+    } else if (geom_type == wkbPolygon) {
+        create_polygon(ogr_polygon_uptr(static_cast<OGRPolygon*> (geom.release())), 
+                exterior_way_ids, interior_way_ids);
+    } else {
+        throw (std::runtime_error(
+                "Landuse item with geometry=" + std::string(geom->getGeometryName()) + " is not yet supported."));
+    }
+    
+    build_landuse_relation_with_tags(layer, feat, exterior_way_ids, interior_way_ids);
+    
+    g_node_buffer.commit();
+    g_way_buffer.commit();
+    g_rel_buffer.commit();
+    geom.release();
+}
+
+/**
  * \brief adds tags from administrative boundaries to mtd_area_map.
  * 		  adds tags from administrative boundaries to mtd_area_map
  * 		  to be accesible when creating the Relations of
  * 		  administrative boundaries.
  * \param handle file handle to navteq administrative meta data.
  */
-void process_meta_areas(boost::filesystem::path dir) {
-    DBFHandle handle = read_dbf_file(dir / MTD_AREA_DBF);
+void process_meta_areas(boost::filesystem::path dir, bool test = false) {
+    DBFHandle handle = read_dbf_file(dir / MTD_AREA_DBF, test ? cnull : std::cerr);
 
     link_id_type last_link_id;
     for (int i = 0; i < DBFGetRecordCount(handle); i++) {
@@ -825,7 +1250,6 @@ void process_meta_areas(boost::filesystem::path dir) {
         data.area_id = area_id;
 
         std::string admin_lvl = std::to_string(dbf_get_uint_by_field(handle, i, ADMIN_LVL));
-
         if (data.admin_lvl.empty()) {
             data.admin_lvl = admin_lvl;
         } else if (data.admin_lvl != admin_lvl) {
@@ -836,10 +1260,17 @@ void process_meta_areas(boost::filesystem::path dir) {
         std::string lang_code = dbf_get_string_by_field(handle, i, LANG_CODE);
         std::string area_name = dbf_get_string_by_field(handle, i, AREA_NAME);
         data.lang_code_2_area_name.push_back(std::make_pair(lang_code, to_camel_case_with_spaces(area_name)));
+        data.area_code_1 = dbf_get_uint_by_field(handle, i, AREA_CODE_1);
 
         g_mtd_area_map.insert(std::make_pair(area_id, data));
     }
     DBFClose(handle);
+}
+
+void preprocess_meta_areas(path_vector_type dirs, bool test = false) {
+    for (auto dir : dirs){
+        process_meta_areas(dir);
+    }
 }
 
 link_id_vector_type collect_via_manoeuvre_link_ids(link_id_type link_id, DBFHandle rdms_handle,
@@ -889,7 +1320,7 @@ osm_id_vector_type collect_via_manoeuvre_osm_ids(const link_id_vector_type& via_
             end_point_back = last_way_back;
         } else {
             if (ctr == 1) {
-                // checks wether assumption is valid and corrects it if necessary
+                // checks whether assumption is valid and corrects it if necessary
                 if (end_point_front == first_way_front || end_point_front == last_way_back) {
                     // reverse via_manoeuvre_osm_id
                     std::reverse(via_manoeuvre_osm_id.begin(), via_manoeuvre_osm_id.end());
@@ -960,17 +1391,95 @@ void add_turn_restrictions(path_vector_type dirs) {
             // todo find out which direction turn restriction has and apply. For now: always apply 'no_straight_on'
             build_turn_restriction(via_manoeuvre_osm_id);
         }
+        DBFClose(rdms_handle);
     }
+}
+
+void add_city_nodes(path_vector_type dirs) {
+
+    for (auto dir : dirs) {
+        DBFHandle name_place_handle = read_dbf_file(dir / NAMED_PLC_DBF);
+        for (int i = 0; i < DBFGetRecordCount(name_place_handle); i++) {
+
+            link_id_type link_id = dbf_get_uint_by_field(name_place_handle, i, LINK_ID);
+            
+            if (g_link_id_map.find(link_id) == g_link_id_map.end()) {
+                std::cerr << "Skipping city node because of missing link id" << std::endl;
+                continue;
+            }
+
+            std::string name_type = dbf_get_string_by_field(name_place_handle, i, POI_NMTYPE);
+            if ( name_type != "B" ) {
+                // Skip this entry as it's just a translated namePlc of former one
+                continue;
+            }
+            
+            uint fac_type = dbf_get_uint_by_field(name_place_handle, i, FAC_TYPE);
+            if ( fac_type != 4444 && fac_type != 9709) {
+                std::cerr << "Skipping city node because of wrong POI type" << std::endl;
+                continue;
+            }
+            
+            //Read location from stored way
+            osm_id_vector_type &osm_id_vector = g_link_id_map.at(link_id);
+            auto first_osm_id = osm_id_vector.at(0);
+            const auto &first_way = g_way_buffer.get<const osmium::Way>(g_way_offset_map.get(first_osm_id));
+            osmium::Location first_way_front = first_way.nodes().front().location();
+
+            //Add new node
+            osmium::builder::NodeBuilder node_builder(g_node_buffer);
+            build_node(first_way_front, &node_builder);
+            osmium::builder::TagListBuilder tl_builder(g_node_buffer, &node_builder);
+                    
+            std::string name = dbf_get_string_by_field(name_place_handle, i, POI_NAME);
+            tl_builder.add_tag("name", to_camel_case_with_spaces( name ));
+
+            uint population = dbf_get_uint_by_field(name_place_handle, i, POPULATION);
+            if (population > 0) tl_builder.add_tag("population", std::to_string(population));
+
+            if (fac_type == 9709) {
+                //9709 means 'neighbourhood'
+                tl_builder.add_tag("place", "neighbourhood");
+            } else {//=> fac_type = 4444 means 'named place' which is the city centre
+                uint capital = dbf_get_uint_by_field(name_place_handle, i, CAPITAL);
+                tl_builder.add_tag("place", get_place_value(population, capital));
+                if (capital == 1) {
+                    //for capitals of countries use 'capital' = 'yes'
+                    tl_builder.add_tag("capital", "yes");
+                } else if (capital > 1) {
+                    //for subdivisions of countries use 'capital' = admin_lvl
+                    tl_builder.add_tag("capital", navteq_2_osm_admin_lvl(capital));
+                }
+            }
+            
+        }
+        DBFClose(name_place_handle);
+    }
+    g_node_buffer.commit();
 }
 
 void init_g_cnd_mod_map(const boost::filesystem::path& dir, std::ostream& out) {
     DBFHandle cnd_mod_handle = read_dbf_file(dir / CND_MOD_DBF, out);
     for (int i = 0; i < DBFGetRecordCount(cnd_mod_handle); i++) {
         cond_id_type cond_id = dbf_get_uint_by_field(cnd_mod_handle, i, COND_ID);
-        // std::string lang_code = dbf_get_string_by_field(cnd_mod_handle, i, LANG_CODE);
+        std::string lang_code = dbf_get_string_by_field(cnd_mod_handle, i, LANG_CODE);
         mod_typ_type mod_type = dbf_get_uint_by_field(cnd_mod_handle, i, CM_MOD_TYPE);
         mod_val_type mod_val = dbf_get_uint_by_field(cnd_mod_handle, i, CM_MOD_VAL);
-        g_cnd_mod_map.insert(std::make_pair(cond_id, mod_group_type(mod_type, mod_val)));
+
+        auto it2 = g_cnd_mod_map.find(cond_id);
+	if (it2 == g_cnd_mod_map.end()) {
+            mod_group_vector_type new_vector;
+            new_vector.push_back(mod_group_type(mod_type, mod_val, lang_code));
+            g_cnd_mod_map.insert(std::make_pair(cond_id, new_vector));
+        } else {
+            //(std::vector<mod_group_type>) ()’
+            auto vector = it2->second;
+            g_cnd_mod_map.erase(it2);
+            vector.push_back(mod_group_type(mod_type, mod_val, lang_code));
+            g_cnd_mod_map.insert(std::make_pair(cond_id, vector));
+        }
+        
+       // g_cnd_mod_map.insert(std::make_pair(cond_id, mod_group_type(mod_type, mod_val, lang_code)));
     }
     DBFClose(cnd_mod_handle);
 }
@@ -980,7 +1489,8 @@ void init_g_cdms_map(const boost::filesystem::path& dir, std::ostream& out) {
     for (int i = 0; i < DBFGetRecordCount(cdms_handle); i++) {
         link_id_type link_id = dbf_get_uint_by_field(cdms_handle, i, LINK_ID);
         cond_id_type cond_id = dbf_get_uint_by_field(cdms_handle, i, COND_ID);
-        g_cdms_map.insert(std::make_pair(link_id, cond_id));
+        ushort cond_type = dbf_get_uint_by_field(cdms_handle, i, COND_TYPE);
+        g_cdms_map.insert(std::make_pair(link_id, cond_pair_type(cond_id, cond_type)));
     }
     DBFClose(cdms_handle);
 }
@@ -1054,6 +1564,27 @@ void init_country_reference(const boost::filesystem::path& dir, std::ostream& ou
     }
 }
 
+void parse_highway_names(const boost::filesystem::path& dbf_file ) {
+    DBFHandle maj_hwys_handle = read_dbf_file(dbf_file);
+    for (int i = 0; i < DBFGetRecordCount(maj_hwys_handle); i++) {
+
+        link_id_type link_id = dbf_get_uint_by_field(maj_hwys_handle, i, LINK_ID);
+        std::string hwy_name = dbf_get_string_by_field(maj_hwys_handle, i, HIGHWAY_NM);
+
+        if (!fits_street_ref(hwy_name)) continue;
+
+        if (g_hwys_ref_map.find(link_id) == g_hwys_ref_map.end())
+            g_hwys_ref_map.insert(std::make_pair(link_id, std::vector<std::string>()));
+        g_hwys_ref_map.at(link_id).push_back(hwy_name);
+    }
+    DBFClose(maj_hwys_handle);
+}
+
+void init_highway_names(const boost::filesystem::path& dir, std::ostream& out) {
+    if (dbf_file_exists(dir / MAJ_HWYS_DBF)) parse_highway_names(dir / MAJ_HWYS_DBF);
+    if (dbf_file_exists(dir / SEC_HWYS_DBF)) parse_highway_names(dir / SEC_HWYS_DBF);
+}
+
 z_lvl_map process_z_levels(const path_vector_type& dirs, ogr_layer_uptr_vector& layer_vector, std::ostream& out) {
     assert(layer_vector.size() == dirs.size());
     z_lvl_map z_level_map;
@@ -1065,6 +1596,7 @@ z_lvl_map process_z_levels(const path_vector_type& dirs, ogr_layer_uptr_vector& 
         init_z_level_map(dir, out, z_level_map);
         init_conditional_driving_manoeuvres(dir, out);
         init_country_reference(dir, out);
+        init_highway_names(dir, out);
     }
     return z_level_map;
 }
@@ -1100,6 +1632,31 @@ void process_way(ogr_layer_uptr_vector& layer_vector, z_lvl_map& z_level_map) {
     }
 }
 
+/**
+ * \brief Parses AltStreets.dbf for route type values.
+ */
+void process_alt_steets_route_types(path_vector_type dirs) {
+    for (auto dir : dirs) {
+        DBFHandle alt_streets_handle = read_dbf_file(dir / ALT_STREETS_DBF);
+        for (int i = 0; i < DBFGetRecordCount(alt_streets_handle); i++) {
+
+            if (dbf_get_string_by_field(alt_streets_handle, i, ROUTE).empty())
+                continue;
+
+            osmium::unsigned_object_id_type link_id = dbf_get_uint_by_field(alt_streets_handle, i, LINK_ID);
+            ushort route_type = dbf_get_uint_by_field(alt_streets_handle, i, ROUTE);
+
+            if (g_route_type_map.find(link_id) == g_route_type_map.end()) {
+                g_route_type_map.insert(std::make_pair(link_id, route_type));
+            } else if (g_route_type_map.at(link_id) > route_type) {
+                //As link id's aren't unique in AltStreets.dbf
+                //just store the lowest route type
+                g_route_type_map[link_id] = route_type;
+            }
+        }
+    }
+}
+
 /****************************************************
  * adds layers to osmium:
  *      cur_layer and cur_feature have to be set
@@ -1129,6 +1686,15 @@ void add_street_shapes(path_vector_type dirs, bool test = false) {
     for (auto elem : z_level_map)
         elem.second.clear();
     z_level_map.clear();
+    
+    // now we can clear some maps:
+    g_hwys_ref_map.clear();
+    g_cdms_map.clear();
+    g_cnd_mod_map.clear();
+    g_area_to_govt_code_map.clear();
+    g_cntry_ref_map.clear();
+    g_z_lvl_nodes_map.clear();
+    g_route_type_map.clear();
 }
 
 void add_street_shapes(boost::filesystem::path dir, bool test = false) {
@@ -1141,9 +1707,7 @@ void add_street_shapes(boost::filesystem::path dir, bool test = false) {
  * \brief adds administrative boundaries to m_buffer / osmium.
  * \param layer pointer to administrative layer.
  */
-
 void add_admin_shape(boost::filesystem::path admin_shape_file, bool test = false) {
-
     ogr_layer_uptr layer(read_shape_file(admin_shape_file));
     assert(layer->GetGeomType() == wkbPolygon);
 
@@ -1152,6 +1716,68 @@ void add_admin_shape(boost::filesystem::path admin_shape_file, bool test = false
     for (auto i = 0; i < feature_count; i++) {
         ogr_feature_uptr feat(layer->GetFeature(i));
         process_admin_boundary(layer, feat);
+        feat.release();
+    }
+}
+        
+/**
+ * \brief adds administrative lines to m_buffer / osmium.
+ * \param layer pointer to administrative layer.
+ */
+void add_admin_lines(boost::filesystem::path admin_line_shape_file, bool test = false) {
+    ogr_layer_uptr layer(read_shape_file(admin_line_shape_file));
+    assert(layer->GetGeomType() == wkbLineString);
+
+    int feature_count = layer->GetFeatureCount(false);
+    assert(feature_count >= 0);
+    for (auto i = 0; i < feature_count; i++) {
+        ogr_feature_uptr feat(layer->GetFeature(i));
+        process_admin_line(layer, feat);
+        feat.release();
+    }
+}
+
+void add_water_shape(boost::filesystem::path water_shape_file) {
+
+    ogr_layer_uptr layer(read_shape_file(water_shape_file));
+    assert(layer->GetGeomType() == wkbPolygon || layer->GetGeomType() == wkbLineString);
+
+    int feature_count = layer->GetFeatureCount(false);
+    assert(feature_count >= 0);
+    for (auto i = 0; i < feature_count; i++) {
+        ogr_feature_uptr feat(layer->GetFeature(i));
+        process_water(layer, feat);
+        feat.release();
+    }
+}
+
+void add_rail_roads(path_vector_type dirs) {
+    for (auto dir : dirs) {
+        if (shp_file_exists(dir / RAIL_ROADS_SHP)) {
+            ogr_layer_uptr layer(read_shape_file(dir / RAIL_ROADS_SHP));
+            assert(layer->GetGeomType() == wkbLineString);
+
+            int feature_count = layer->GetFeatureCount(false);
+            assert(feature_count >= 0);
+            for (auto i = 0; i < feature_count; i++) {
+                ogr_feature_uptr feat(layer->GetFeature(i));
+                process_rail_road(layer, feat);
+                feat.release();
+            }
+        }
+    }
+}
+
+void add_landuse_shape(boost::filesystem::path landuse_shape_file) {
+
+    ogr_layer_uptr layer(read_shape_file(landuse_shape_file));
+    assert(layer->GetGeomType() == wkbPolygon);
+
+    int feature_count = layer->GetFeatureCount(false);
+    assert(feature_count >= 0);
+    for (auto i = 0; i < feature_count; i++) {
+        ogr_feature_uptr feat(layer->GetFeature(i));
+        process_landuse(layer, feat);
         feat.release();
     }
 }
@@ -1170,6 +1796,7 @@ void clear_all() {
     g_rel_buffer.clear();
     g_osm_id = 1;
     g_link_id_map.clear();
+    g_hwys_ref_map.clear();
     g_way_offset_map.clear();
     g_mtd_area_map.clear();
 }

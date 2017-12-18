@@ -12,6 +12,7 @@
 #include <gdal/ogrsf_frmts.h>
 #include <shapefil.h>
 #include <osmium/osm/types.hpp>
+#include <osmium/builder/osm_object_builder.hpp>
 #include <sstream>
 #include <boost/iostreams/stream.hpp>
 #include <boost/iostreams/device/null.hpp>
@@ -22,6 +23,8 @@
 #include "readers.hpp"
 #include "ogr_types.hpp"
 #include "ogr_util.hpp"
+
+#include <unicode/unistr.h>
 
 #include <bits/unique_ptr.h>
 
@@ -214,5 +217,31 @@ static_unique_ptr_cast( std::unique_ptr<Base, Del>&& p )
     return std::unique_ptr<Derived, Del>(d, std::move(p.get_deleter()));
 }
 
+/**
+ * \brief duplicate const char* value to change
+ */
+std::string to_camel_case_with_spaces(const char* camel) {
+    icu::UnicodeString uniString( camel, "UTF-8" );
+    uniString.toTitle(0);
+    
+    std::string response;
+    uniString.toUTF8String(response);
+    return response;
+}
+
+/**
+ * \brief apply camel case with spaces to string
+ */
+std::string to_camel_case_with_spaces(std::string camel) {
+    return to_camel_case_with_spaces(camel.c_str());
+}
+
+void add_uint_tag(osmium::builder::TagListBuilder* tl_builder, const char* tag_key,
+        uint uint_tag_val) {
+    std::string val_s = std::to_string(uint_tag_val);
+    if (tag_key) {
+        tl_builder->add_tag(tag_key, val_s.c_str());
+    }
+}
 
 #endif /* UTIL_HPP_ */

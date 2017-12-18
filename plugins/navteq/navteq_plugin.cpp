@@ -47,12 +47,18 @@ bool navteq_plugin::check_files(boost::filesystem::path dir) {
     if (!dbf_file_exists(dir / RDMS_DBF     )) return false;
     if (!dbf_file_exists(dir / CDMS_DBF     )) return false;
     if (!dbf_file_exists(dir / ZLEVELS_DBF  )) return false;
+    if (!dbf_file_exists(dir / MAJ_HWYS_DBF )) return false;
+    if (!dbf_file_exists(dir / SEC_HWYS_DBF )) return false;
+    if (!dbf_file_exists(dir / NAMED_PLC_DBF)) return false;
+    if (!dbf_file_exists(dir / ALT_STREETS_DBF)) return false;
 
     if (!shp_file_exists(dir / ADMINBNDY_1_SHP)) std::cerr << "  administrative boundaries level 1 are missing\n";
     if (!shp_file_exists(dir / ADMINBNDY_2_SHP)) std::cerr << "  administrative boundaries level 2 are missing\n";
     if (!shp_file_exists(dir / ADMINBNDY_3_SHP)) std::cerr << "  administrative boundaries level 3 are missing\n";
     if (!shp_file_exists(dir / ADMINBNDY_4_SHP)) std::cerr << "  administrative boundaries level 4 are missing\n";
     if (!shp_file_exists(dir / ADMINBNDY_5_SHP)) std::cerr << "  administrative boundaries level 5 are missing\n";
+    if (!shp_file_exists(dir / ADMINLINE_1_SHP)) std::cerr << "  administrative lines level 1 are missing\n";
+
     return true;
 }
 
@@ -111,31 +117,54 @@ void navteq_plugin::write_output() {
 }
 
 void navteq_plugin::add_administrative_boundaries() {
-
-    // todo admin-levels only apply to the US => more generic for all countries
-    for (auto dir : dirs){
-        process_meta_areas(dir);
-    }
-
     for (auto dir : dirs) {
         if (shp_file_exists(dir / ADMINBNDY_1_SHP)) add_admin_shape(dir / ADMINBNDY_1_SHP);
         if (shp_file_exists(dir / ADMINBNDY_2_SHP)) add_admin_shape(dir / ADMINBNDY_2_SHP);
         if (shp_file_exists(dir / ADMINBNDY_3_SHP)) add_admin_shape(dir / ADMINBNDY_3_SHP);
         if (shp_file_exists(dir / ADMINBNDY_4_SHP)) add_admin_shape(dir / ADMINBNDY_4_SHP);
         if (shp_file_exists(dir / ADMINBNDY_5_SHP)) add_admin_shape(dir / ADMINBNDY_5_SHP);
+        //for some countries the Adminbndy1.shp doesn't contain the whole country border
+        //therefore we additionally add the links from AdminLine1.shp
+        if (shp_file_exists(dir / ADMINLINE_1_SHP)) add_admin_lines(dir / ADMINLINE_1_SHP);
     }
+    
     g_mtd_area_map.clear();
+}
+
+void navteq_plugin::add_water() {
+    for (auto dir : dirs) {
+        if (shp_file_exists(dir / WATER_POLY_SHP)) add_water_shape(dir / WATER_POLY_SHP);
+        if (shp_file_exists(dir / WATER_SEG_SHP )) add_water_shape(dir / WATER_SEG_SHP );
+    }
+}
+
+void navteq_plugin::add_landuse() {
+    for (auto dir : dirs) {
+        if (shp_file_exists(dir / LAND_USE_A_SHP)) add_landuse_shape(dir / LAND_USE_A_SHP);
+        if (shp_file_exists(dir / LAND_USE_B_SHP)) add_landuse_shape(dir / LAND_USE_B_SHP);
+    }
 }
 
 void navteq_plugin::execute() {
 
+    preprocess_meta_areas(dirs);
+
+    process_alt_steets_route_types(dirs);
     add_street_shapes(dirs);
     assert__id_uniqueness();
 
     add_turn_restrictions(dirs);
     assert__id_uniqueness();
+    
+    add_rail_roads(dirs);
 
     add_administrative_boundaries();
+    
+    add_water();
+    
+    add_landuse();
+    
+    add_city_nodes(dirs);
 
     if (!output_path.empty()) write_output();
 
