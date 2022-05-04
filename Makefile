@@ -39,16 +39,8 @@ UTIL_TEST_HEADER=plugins/util.hpp
 # includes
 OSMIUM_INCLUDE=-I${HOME}/libs/libosmium/include
 
-ifeq ($(TRAVIS),true)
-OSMPBF_INCLUDE=-I${HOME}/libs/OSM-binary/include
-OSMPBF_LIBRARY=${HOME}/libs/OSM-binary/src/libosmpbf.a
-else
-OSMPBF_INCLUDE=
-OSMPBF_LIBRARY=-losmpbf
-endif
-
 INCLUDES=${OSMIUM_INCLUDE} -Iplugins ${OSMPBF_INCLUDE}
-LIBS=-lbz2 -lgdal -lexpat -lgeos -lpthread -lz -lprotobuf-lite -lboost_system -lboost_filesystem ${OSMPBF_LIBRARY}
+LIBS=-lbz2 -lgdal -lexpat -lgeos -lpthread -lz -lprotobuf-lite -lboost_system -lboost_filesystem -lshp
 
 CXXFLAGS=-std=c++11 
 DEBUG_FLAGS=-O0 -g
