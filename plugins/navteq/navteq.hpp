@@ -269,24 +269,26 @@ osmium::unsigned_object_id_type build_way(ogr_feature_uptr& feat, ogr_line_strin
     set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
 
     builder.add_user(USER);
-    osmium::builder::WayNodeListBuilder wnl_builder(g_way_buffer, &builder);
-    for (int i = 0; i < ogr_ls->getNumPoints(); i++) {
-        osmium::Location location(ogr_ls->getX(i), ogr_ls->getY(i));
-        bool is_end_point = i == 0 || i == ogr_ls->getNumPoints() - 1;
-        std::map<osmium::Location, osmium::unsigned_object_id_type> *map_containing_node;
-        if (!is_sub_linestring) {
-            if (is_end_point) map_containing_node = &g_way_end_points_map;
-            else map_containing_node = node_ref_map;
-        } else {
-            if (node_ref_map->find(location) != node_ref_map->end()) {
-                map_containing_node = node_ref_map;
+    {
+        osmium::builder::WayNodeListBuilder wnl_builder(g_way_buffer, &builder);
+        for (int i = 0; i < ogr_ls->getNumPoints(); i++) {
+            osmium::Location location(ogr_ls->getX(i), ogr_ls->getY(i));
+            bool is_end_point = i == 0 || i == ogr_ls->getNumPoints() - 1;
+            std::map<osmium::Location, osmium::unsigned_object_id_type> *map_containing_node;
+            if (!is_sub_linestring) {
+                if (is_end_point) map_containing_node = &g_way_end_points_map;
+                else map_containing_node = node_ref_map;
             } else {
-                // node has to be in node_ref_map or way_end_points_map
-                assert(g_way_end_points_map.find(location) != g_way_end_points_map.end());
-                map_containing_node = &g_way_end_points_map;
+                if (node_ref_map->find(location) != node_ref_map->end()) {
+                    map_containing_node = node_ref_map;
+                } else {
+                    // node has to be in node_ref_map or way_end_points_map
+                    assert(g_way_end_points_map.find(location) != g_way_end_points_map.end());
+                    map_containing_node = &g_way_end_points_map;
+                }
             }
+            add_way_node(location, wnl_builder, map_containing_node);
         }
-        add_way_node(location, wnl_builder, map_containing_node);
     }
 
     link_id_type link_id = build_tag_list(feat, &builder, g_way_buffer, z_lvl);
