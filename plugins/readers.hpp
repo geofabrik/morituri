@@ -8,7 +8,9 @@
 #ifndef PLUGINS_READERS_HPP_
 #define PLUGINS_READERS_HPP_
 
+#include <iostream>
 #include <gdal/ogrsf_frmts.h>
+#include <gdal/gdal_priv.h>
 #include <boost/filesystem/path.hpp>
 
 #include "comm2osm_exceptions.hpp"
@@ -25,7 +27,10 @@ OGRLayer* read_shape_file(boost::filesystem::path shp_file, std::ostream& out = 
     RegisterOGRShape();
     out << "reading " << shp_file << std::endl;
 
-    OGRDataSource *input_data_source = OGRSFDriverRegistrar::Open(shp_file.c_str(), FALSE);
+    // TODO memory leak?
+    GDALDataset* input_data_source = static_cast<GDALDataset*>(GDALOpenEx(shp_file.c_str(),
+                GDAL_OF_VECTOR | GDAL_OF_READONLY | GDAL_OF_VERBOSE_ERROR, NULL, NULL, NULL));
+
     if (input_data_source == NULL) throw(shp_error(shp_file.string()));
 
     OGRLayer *input_layer = input_data_source->GetLayer(0);

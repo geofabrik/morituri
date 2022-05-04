@@ -46,13 +46,15 @@ const double SHORT_TON = 0.90718474;
 bool shp_file_exists(const char* shp_file) {
 
     RegisterOGRShape();
-    OGRDataSource *shapedriver = OGRSFDriverRegistrar::Open(shp_file, FALSE);
-    if (shapedriver == NULL) {
-        OGRCleanupAll();
-        return false;
+    {
+        std::unique_ptr<GDALDataset> shapedriver {static_cast<GDALDataset*>(GDALOpenEx(shp_file,
+                    GDAL_OF_VECTOR | GDAL_OF_READONLY | GDAL_OF_VERBOSE_ERROR, NULL, NULL, NULL))};
+        if (!shapedriver) {
+            OGRCleanupAll();
+            return false;
+        }
     }
     OGRCleanupAll();
-    delete shapedriver;
     return true;
 }
 
