@@ -157,7 +157,7 @@ TEST_CASE("ogr2wkb", "[ogr2wkb]"){
     char* wkt = new char[1024];
     strcpy(wkt,"LINESTRING (30 10, 10 30, 40 40)");
     std::string wkb_reference = "0102000000030000000000000000003e4000000000000024400000000000002440000000000000"
-            "3e400000000000004440000000000000444000000000000000";
+            "3e400000000000004440000000000000444000202020313030";
     // in postgis: select st_astext('_____wkb_reference_____'::geometry) => LINESTRING (30 10, 10 30, 40 40);
 
     OGRErr res = OGRGeometryFactory::createFromWkt(&wkt, nullptr, &ogr_geom);
