@@ -142,27 +142,29 @@ void add_common_node_as_via(const osm_id_vector_type& osm_ids, osmium::builder::
  * \return Last number of committed bytes to m_buffer before this commit.
  */
 size_t build_turn_restriction(const osm_id_vector_type& osm_ids) {
-
-    osmium::builder::RelationBuilder builder(g_rel_buffer);
-    STATIC_RELATION(builder.object()).set_id(std::to_string(g_osm_id++).c_str());
-    set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
-    builder.add_user(USER);
-
     {
-        osmium::builder::RelationMemberListBuilder rml_builder(g_rel_buffer, &builder);
+        osmium::builder::RelationBuilder builder(g_rel_buffer);
+        STATIC_RELATION(builder.object()).set_id(std::to_string(g_osm_id++).c_str());
+        set_dummy_osm_object_attributes(STATIC_OSMOBJECT(builder.object()));
+        builder.add_user(USER);
 
-        assert(osm_ids.size() >= 2);
+        {
+            osmium::builder::RelationMemberListBuilder rml_builder(g_rel_buffer, &builder);
 
-        rml_builder.add_member(osmium::item_type::way, osm_ids.at(0), "from");
-        for (int i = 1; i < osm_ids.size() - 1; i++)
-            rml_builder.add_member(osmium::item_type::way, osm_ids.at(i), "via");
-        if (osm_ids.size() == 2) add_common_node_as_via(osm_ids, rml_builder);
-        rml_builder.add_member(osmium::item_type::way, osm_ids.at(osm_ids.size() - 1), "to");
+            assert(osm_ids.size() >= 2);
 
-        osmium::builder::TagListBuilder tl_builder(g_rel_buffer, &builder);
-        // todo get the correct direction of the turn restriction
-        tl_builder.add_tag("restriction", "no_straight_on");
-        tl_builder.add_tag("type", "restriction");
+            rml_builder.add_member(osmium::item_type::way, osm_ids.at(0), "from");
+            for (int i = 1; i < osm_ids.size() - 1; i++)
+                rml_builder.add_member(osmium::item_type::way, osm_ids.at(i), "via");
+            if (osm_ids.size() == 2) add_common_node_as_via(osm_ids, rml_builder);
+            rml_builder.add_member(osmium::item_type::way, osm_ids.at(osm_ids.size() - 1), "to");
+        }
+        {
+            osmium::builder::TagListBuilder tl_builder(g_rel_buffer, &builder);
+            // todo get the correct direction of the turn restriction
+            tl_builder.add_tag("restriction", "no_straight_on");
+            tl_builder.add_tag("type", "restriction");
+        }
     }
     return g_rel_buffer.commit();
 }
