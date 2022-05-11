@@ -29,7 +29,7 @@ void add_highway_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr&
 	const char* residential = "residential";
 	const char* unclassified = "unclassified";
 
-	bool urban = parse_bool(get_field_from_feature(f, URBAN));
+	bool urban = parse_bool(get_field_from_feature(f.get(), URBAN));
 
 	if (link_id == 871827859){
 		std::cout << link_id << " - route_type=" << route_type << ", func_class=" << func_class << std::endl;
@@ -106,17 +106,17 @@ void add_one_way_tag(osmium::builder::TagListBuilder* builder, const char* value
 }
 
 void add_access_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f) {
-    if (! parse_bool(get_field_from_feature(f, AR_AUTO))) builder->add_tag("motorcar",  NO);
-    if (! parse_bool(get_field_from_feature(f, AR_BUS))) builder->add_tag("bus",  NO);
-    if (! parse_bool(get_field_from_feature(f, AR_TAXIS))) builder->add_tag("taxi",  NO);
+    if (! parse_bool(get_field_from_feature(f.get(), AR_AUTO))) builder->add_tag("motorcar",  NO);
+    if (! parse_bool(get_field_from_feature(f.get(), AR_BUS))) builder->add_tag("bus",  NO);
+    if (! parse_bool(get_field_from_feature(f.get(), AR_TAXIS))) builder->add_tag("taxi",  NO);
 //    if (! parse_bool(get_field_from_feature(f, AR_CARPOOL))) builder->add_tag("hov",  NO);
-    if (! parse_bool(get_field_from_feature(f, AR_PEDESTRIANS))) builder->add_tag("foot",  NO);
-    if (! parse_bool(get_field_from_feature(f, AR_TRUCKS))) builder->add_tag("hgv", NO);
-    if (! parse_bool(get_field_from_feature(f, AR_EMERVEH))) builder->add_tag("emergency",  NO);
-    if (! parse_bool(get_field_from_feature(f, AR_MOTORCYCLES))) builder->add_tag("motorcycle",  NO);
-    if (!parse_bool(get_field_from_feature(f, PUB_ACCESS)) || parse_bool(get_field_from_feature(f, PRIVATE))){
+    if (! parse_bool(get_field_from_feature(f.get(), AR_PEDESTRIANS))) builder->add_tag("foot",  NO);
+    if (! parse_bool(get_field_from_feature(f.get(), AR_TRUCKS))) builder->add_tag("hgv", NO);
+    if (! parse_bool(get_field_from_feature(f.get(), AR_EMERVEH))) builder->add_tag("emergency",  NO);
+    if (! parse_bool(get_field_from_feature(f.get(), AR_MOTORCYCLES))) builder->add_tag("motorcycle",  NO);
+    if (!parse_bool(get_field_from_feature(f.get(), PUB_ACCESS)) || parse_bool(get_field_from_feature(f.get(), PRIVATE))){
         builder->add_tag("access", "private");
-    } else if (!parse_bool(get_field_from_feature(f, AR_THROUGH_TRAFFIC))){
+    } else if (!parse_bool(get_field_from_feature(f.get(), AR_THROUGH_TRAFFIC))){
         builder->add_tag("access", "destination");
     }
 }
@@ -172,24 +172,24 @@ std::string to_camel_case_with_spaces(const char* camel) {
  * \brief adds maxspeed tag
  */
 void add_maxspeed_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f) {
-    const char* from_speed_limit_s = strdup(get_field_from_feature(f, FR_SPEED_LIMIT));
-    const char* to_speed_limit_s = strdup(get_field_from_feature(f, TO_SPEED_LIMIT));
+    std::string from_speed_limit_s {get_field_from_feature(f.get(), FR_SPEED_LIMIT)};
+    std::string to_speed_limit_s {get_field_from_feature(f.get(), TO_SPEED_LIMIT)};
 
-    uint from_speed_limit = get_uint_from_feature(f, FR_SPEED_LIMIT);
-    uint to_speed_limit = get_uint_from_feature(f, TO_SPEED_LIMIT);
+    uint from_speed_limit = get_uint_from_feature(f.get(), FR_SPEED_LIMIT);
+    uint to_speed_limit = get_uint_from_feature(f.get(), TO_SPEED_LIMIT);
 
     if (from_speed_limit >= 1000 || to_speed_limit >= 1000)
         throw(format_error(
-                "from_speed_limit='" + std::string(from_speed_limit_s) + "' or to_speed_limit='"
-                        + std::string(to_speed_limit_s) + "' is not valid (>= 1000)"));
+                "from_speed_limit='" + from_speed_limit_s + "' or to_speed_limit='"
+                        + to_speed_limit_s + "' is not valid (>= 1000)"));
 
     // 998 is a ramp without speed limit information
     if (from_speed_limit == 998 || to_speed_limit == 998)
         return;
 
     // 999 means no speed limit at all
-    const char* from = from_speed_limit == 999 ? "none" : from_speed_limit_s;
-    const char* to = to_speed_limit == 999 ? "none" : to_speed_limit_s;
+    const char* from = from_speed_limit == 999 ? "none" : from_speed_limit_s.c_str();
+    const char* to = to_speed_limit == 999 ? "none" : to_speed_limit_s.c_str();
 
     if (from_speed_limit != 0 && to_speed_limit != 0) {
         if (from_speed_limit != to_speed_limit) {
@@ -214,7 +214,7 @@ void add_maxspeed_tags(osmium::builder::TagListBuilder* builder, ogr_feature_upt
  * \brief adds here:speed_cat tag
  */
 void add_here_speed_cat_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f) {
-    auto speed_cat = get_uint_from_feature(f, SPEED_CAT);
+    auto speed_cat = get_uint_from_feature(f.get(), SPEED_CAT);
     if (0 < speed_cat && speed_cat < (sizeof(speed_cat_metric) / sizeof(const char*))) builder->add_tag(
             "here:speed_cat", speed_cat_metric[speed_cat]);
     else throw format_error("SPEED_CAT=" + std::to_string(speed_cat) + " is not valid.");
@@ -315,26 +315,26 @@ bool is_ferry(const char* value) {
 }
 
 bool only_pedestrians(ogr_feature_uptr& f) {
-    if (strcmp(get_field_from_feature(f, AR_PEDESTRIANS), "Y")) return false;
-    if (! strcmp(get_field_from_feature(f, AR_AUTO),"Y")) return false;
-    if (! strcmp(get_field_from_feature(f, AR_BUS),"Y")) return false;
+    if (strcmp(get_field_from_feature(f.get(), AR_PEDESTRIANS), "Y")) return false;
+    if (! strcmp(get_field_from_feature(f.get(), AR_AUTO),"Y")) return false;
+    if (! strcmp(get_field_from_feature(f.get(), AR_BUS),"Y")) return false;
 //    if (! strcmp(get_field_from_feature(f, AR_CARPOOL),"Y")) return false;
-    if (! strcmp(get_field_from_feature(f, AR_EMERVEH),"Y")) return false;
-    if (! strcmp(get_field_from_feature(f, AR_MOTORCYCLES),"Y")) return false;
-    if (! strcmp(get_field_from_feature(f, AR_TAXIS),"Y")) return false;
-    if (! strcmp(get_field_from_feature(f, AR_THROUGH_TRAFFIC),"Y")) return false;
+    if (! strcmp(get_field_from_feature(f.get(), AR_EMERVEH),"Y")) return false;
+    if (! strcmp(get_field_from_feature(f.get(), AR_MOTORCYCLES),"Y")) return false;
+    if (! strcmp(get_field_from_feature(f.get(), AR_TAXIS),"Y")) return false;
+    if (! strcmp(get_field_from_feature(f.get(), AR_THROUGH_TRAFFIC),"Y")) return false;
     return true;
 }
 
 void add_ferry_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f) {
-    const char* ferry = get_field_from_feature(f, FERRY);
+    const char* ferry = get_field_from_feature(f.get(), FERRY);
     builder->add_tag("route", "ferry");
     if (!strcmp(ferry, "B")) {
         if (only_pedestrians(f)) {
             builder->add_tag("foot", YES);
         } else {
-            builder->add_tag("foot", parse_bool(get_field_from_feature(f, AR_PEDESTRIANS)) ? YES : NO);
-            builder->add_tag("motorcar", parse_bool(get_field_from_feature(f, AR_AUTO)) ? YES : NO);
+            builder->add_tag("foot", parse_bool(get_field_from_feature(f.get(), AR_PEDESTRIANS)) ? YES : NO);
+            builder->add_tag("motorcar", parse_bool(get_field_from_feature(f.get(), AR_AUTO)) ? YES : NO);
         }
 
     } else if (!strcmp(ferry, "R")) {
@@ -343,13 +343,13 @@ void add_ferry_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f
 }
 
 void add_lanes_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f) {
-    const char* number_of_physical_lanes = get_field_from_feature(f, PHYS_LANES);
+    const char* number_of_physical_lanes = get_field_from_feature(f.get(), PHYS_LANES);
     if (strcmp(number_of_physical_lanes, "0")) builder->add_tag("lanes", number_of_physical_lanes);
 }
 
 void add_postcode_tag(osmium::builder::TagListBuilder* builder, ogr_feature_uptr& f) {
-	std::string l_postcode = get_field_from_feature(f, L_POSTCODE);
-	std::string r_postcode = get_field_from_feature(f, R_POSTCODE);
+	std::string l_postcode = get_field_from_feature(f.get(), L_POSTCODE);
+	std::string r_postcode = get_field_from_feature(f.get(), R_POSTCODE);
 
 	if (l_postcode.empty() && r_postcode.empty()) return;
 
@@ -364,24 +364,24 @@ void add_highway_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr
         cdms_map_type* cdms_map, cnd_mod_map_type* cnd_mod_map) {
 
     uint route_type = 0, func_class = 0;
-    std::string route_type_s = get_field_from_feature(f, ROUTE);
-    std::string func_class_s = get_field_from_feature(f, FUNC_CLASS);
-	if (!route_type_s.empty()) route_type = get_uint_from_feature(f, ROUTE);
-	if (!func_class_s.empty()) func_class = get_uint_from_feature(f, FUNC_CLASS);
+    std::string route_type_s = get_field_from_feature(f.get(), ROUTE);
+    std::string func_class_s = get_field_from_feature(f.get(), FUNC_CLASS);
+	if (!route_type_s.empty()) route_type = get_uint_from_feature(f.get(), ROUTE);
+	if (!func_class_s.empty()) func_class = get_uint_from_feature(f.get(), FUNC_CLASS);
 
     add_highway_tag(builder, f, link_id, route_type, func_class);
-    add_one_way_tag(builder, get_field_from_feature(f, DIR_TRAVEL));
+    add_one_way_tag(builder, get_field_from_feature(f.get(), DIR_TRAVEL));
     add_access_tags(builder, f);
     add_maxspeed_tags(builder, f);
     add_lanes_tag(builder, f);
     add_postcode_tag(builder, f);
 
-    if (parse_bool(get_field_from_feature(f, PAVED))) builder->add_tag("surface", "paved");
-    if (parse_bool(get_field_from_feature(f, BRIDGE))) builder->add_tag("bridge", YES);
-    if (parse_bool(get_field_from_feature(f, TUNNEL))) builder->add_tag("tunnel", YES);
-    if (parse_bool(get_field_from_feature(f, TOLLWAY))) builder->add_tag("toll", YES);
-    if (parse_bool(get_field_from_feature(f, ROUNDABOUT))) builder->add_tag("junction", "roundabout");
-    if (parse_bool(get_field_from_feature(f, FOURWHLDR))) builder->add_tag("4wd_only", YES);
+    if (parse_bool(get_field_from_feature(f.get(), PAVED))) builder->add_tag("surface", "paved");
+    if (parse_bool(get_field_from_feature(f.get(), BRIDGE))) builder->add_tag("bridge", YES);
+    if (parse_bool(get_field_from_feature(f.get(), TUNNEL))) builder->add_tag("tunnel", YES);
+    if (parse_bool(get_field_from_feature(f.get(), TOLLWAY))) builder->add_tag("toll", YES);
+    if (parse_bool(get_field_from_feature(f.get(), ROUNDABOUT))) builder->add_tag("junction", "roundabout");
+    if (parse_bool(get_field_from_feature(f.get(), FOURWHLDR))) builder->add_tag("4wd_only", YES);
 }
 
 /**
@@ -391,29 +391,29 @@ void add_highway_tags(osmium::builder::TagListBuilder* builder, ogr_feature_uptr
 link_id_type parse_street_tags(osmium::builder::TagListBuilder *builder, ogr_feature_uptr& f, cdms_map_type* cdms_map =
         nullptr, cnd_mod_map_type* cnd_mod_map = nullptr, area_id_govt_code_map_type* area_govt_map = nullptr,
         cntry_ref_map_type* cntry_map = nullptr) {
-    const char* link_id_s = get_field_from_feature(f, LINK_ID);
+    const char* link_id_s = get_field_from_feature(f.get(), LINK_ID);
     link_id_type link_id = std::stoul(link_id_s);
     builder->add_tag(LINK_ID, link_id_s); // tag for debug purpose
 
-    builder->add_tag("name", to_camel_case_with_spaces(get_field_from_feature(f, ST_NAME)).c_str());
-    if (is_ferry(get_field_from_feature(f, FERRY))) {
+    builder->add_tag("name", to_camel_case_with_spaces(get_field_from_feature(f.get(), ST_NAME)).c_str());
+    if (is_ferry(get_field_from_feature(f.get(), FERRY))) {
         add_ferry_tag(builder, f);
     } else {  // usual highways
         add_highway_tags(builder, f, link_id, cdms_map, cnd_mod_map);
     }
 
-    area_id_type l_area_id = get_uint_from_feature(f, L_AREA_ID);
-    area_id_type r_area_id = get_uint_from_feature(f, R_AREA_ID);
+    area_id_type l_area_id = get_uint_from_feature(f.get(), L_AREA_ID);
+    area_id_type r_area_id = get_uint_from_feature(f.get(), R_AREA_ID);
     // tags which apply to highways and ferry routes
     add_additional_restrictions(builder, link_id, l_area_id, r_area_id, cdms_map, cnd_mod_map, area_govt_map,
             cntry_map);
     add_here_speed_cat_tag(builder, f);
-    if (parse_bool(get_field_from_feature(f, TOLLWAY))) builder->add_tag("here:tollway", YES);
-    if (parse_bool(get_field_from_feature(f, URBAN))) builder->add_tag("here:urban", YES);
-    std::string route_type = get_field_from_feature(f, ROUTE);
+    if (parse_bool(get_field_from_feature(f.get(), TOLLWAY))) builder->add_tag("here:tollway", YES);
+    if (parse_bool(get_field_from_feature(f.get(), URBAN))) builder->add_tag("here:urban", YES);
+    std::string route_type = get_field_from_feature(f.get(), ROUTE);
     if (!route_type.empty()) builder->add_tag("here:route_type", route_type.c_str());
 
-    std::string func_class = get_field_from_feature(f, FUNC_CLASS);
+    std::string func_class = get_field_from_feature(f.get(), FUNC_CLASS);
     if (!func_class.empty()) builder->add_tag("here:func_class", func_class.c_str());
 
 

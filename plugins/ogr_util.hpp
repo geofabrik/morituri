@@ -103,21 +103,30 @@ std::unique_ptr<geos::geom::CoordinateSequence> cut_front(double cut, std::uniqu
 	std::vector<geos::geom::Coordinate> shortened_vec(old_vec);
     while (cut >= node_distance) {
         shortened_vec.reserve(old_vec.size() - 1);
-        std::copy(++(old_vec.begin()), old_vec.end(), shortened_vec.begin());
+        std::move(++(old_vec.begin()), old_vec.end(), shortened_vec.begin());
+        old_vec.clear();
         old_vec = std::move(shortened_vec);
         cut -= node_distance;
-        node_distance = std::abs(geos_cs->getAt(0).distance(geos_cs->getAt(1)));
+        if (old_vec.size() >= 2) {
+            node_distance = std::abs(geos_cs->getAt(0).distance(geos_cs->getAt(1)));
+        } else {
+            break;
+        }
     }
     shortened_vec = std::move(old_vec);
     assert(cut >= 0);
-    if (cut > 0) shortened_vec.at(0) = move_point(geos_cs->getAt(0), geos_cs->getAt(1), cut);
+    if (cut > 0 && shortened_vec.size() > 0) shortened_vec.at(0) = move_point(geos_cs->getAt(0), geos_cs->getAt(1), cut);
     new_cs.reset(new geos::geom::CoordinateArraySequence(std::move(shortened_vec)));
     return std::move(new_cs);
 }
 
 std::unique_ptr<geos::geom::CoordinateSequence> cut_back(double cut, std::unique_ptr<geos::geom::CoordinateSequence>&& geos_cs) {
     auto len = geos_cs->getSize();
-    assert(len >= 2);
+    if (len < 2) {
+        return std::unique_ptr<geos::geom::CoordinateSequence>(
+                new geos::geom::CoordinateArraySequence(std::vector<geos::geom::Coordinate>())
+        );
+    }
     auto moving_coord = geos_cs->getAt(len - 1);
     auto reference_coord = geos_cs->getAt(len - 2);
     double node_distance = std::abs(moving_coord.distance(reference_coord));
@@ -126,12 +135,11 @@ std::unique_ptr<geos::geom::CoordinateSequence> cut_back(double cut, std::unique
 	vec.reserve(geos_cs->size());
 	geos_cs->toVector(vec);
     while (cut >= node_distance) {
-        geos_cs->toVector(vec);
         vec.pop_back();
         cut -= node_distance;
-        len = geos_cs->getSize();
-        moving_coord = geos_cs->getAt(len - 1);
-        reference_coord = geos_cs->getAt(len - 2);
+        len = vec.size();
+        moving_coord = vec.at(len - 1);
+        reference_coord = vec.at(len - 2);
         node_distance = std::abs(moving_coord.distance(reference_coord));
     }
     assert(cut >= 0);
@@ -159,9 +167,10 @@ OGRLineString* create_offset_curve(OGRLineString* ogr_ls, double offset, bool le
     if (!npm) npm = new geos::geom::PrecisionModel();
     if (!geos_factory) geos_factory = geos::geom::GeometryFactory::create(npm);
 
-    geos::operation::buffer::OffsetCurveBuilder* offset_curve_builder;
-    offset_curve_builder = new geos::operation::buffer::OffsetCurveBuilder(npm,
-            geos::operation::buffer::BufferParameters());
+    std::unique_ptr<geos::operation::buffer::OffsetCurveBuilder> offset_curve_builder {
+        new geos::operation::buffer::OffsetCurveBuilder(npm,
+            geos::operation::buffer::BufferParameters())
+    };
 
     std::vector<geos::geom::CoordinateSequence*> cs_vec;
     offset_curve_builder->getSingleSidedLineCurve(ogr2geos(ogr_ls)->getCoordinates().get(), offset, cs_vec, left, !left);
