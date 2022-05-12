@@ -636,9 +636,9 @@ void process_way(ogr_feature_uptr&& feat, z_lvl_map *z_level_map) {
         split_way_by_z_level(feat, ogr_ls, index_z_lvl_vector, &node_ref_map, link_id);
     }
 
-    if (!strcmp(get_field_from_feature(feat.get(), ADDR_TYPE), "B")) {
-        create_house_numbers(feat, ogr_ls);
-    }
+//    if (!strcmp(get_field_from_feature(feat.get(), ADDR_TYPE), "B")) {
+//        create_house_numbers(feat, ogr_ls);
+//    }
     // ogr_ls will be cleaned alongside with feat
     ogr_ls.release();
 }
